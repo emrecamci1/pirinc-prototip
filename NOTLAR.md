@@ -20,9 +20,8 @@ Sahne yoksa veya bozuksa menuden tekrar kur; `Assets/Editor/SetupStackScene.cs` 
 
 ## YIGIN (aktif prototip)
 
-Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz. Kat GOREV
-doldurunca asagiki kata iniyoruz (`TasksPerLayer`, varsayilan 3), o katta birakilanlar
-bizimle dusuyor. Tahtayi supurmek diye bir sey yok.
+Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz. Kat tamamen
+BOSALINCA asagiki kata iniyoruz: her kata konan her renk kullanilacak.
 
 **Hedef (2026-11-23):** parcanin ustune devrilince onu yok etmiyorsun, RENGINI
 aliyorsun - ucgen o renge donuyor. Tek renk tasiniyor, yenisini almak eskisini siler.
@@ -54,17 +53,25 @@ Gorev her zaman o katta GERCEKTEN duran renklerden kuruluyor ve tamamlanamaz hal
 gelirse (`TaskPossible`) aninda yenileniyor. Oyuncunun hicbir hamleyle duzeltemeyecegi
 bir hedef ekranda durmamali.
 
-**Gerekmeyen renkler DUVAR (`Open` / `Takeable`).** Ustunden gecip yok edemiyorsun,
-yolunu onlara gore kuruyorsun. Eskiden her parca uzerine basilinca kalkiyordu ve bu
-oyunu kendi kendine bitiriyordu: ileride lazim olacak renkler yolda harcaniyordu.
-Kare gorevinde sadece TASINACAK renk basilabilir, esi tahtada kalmali.
+**Gerekmeyen parcanin USTUNDEN gecersin (`Pick` / `MePos`).** Yok olmaz, yol da
+kesmez: ucgen onun ustune binip devam eder, bir `TriThick` yukarida durur.
 
-Kontrol `Landing`'in icinde degil: ulasilabilirlik hesabi tahtanin sabit seklini
-cikariyor, duvarlar ise oyun sirasinda degisiyor. `MarkReach` duvarlari gormemeli.
+Bu noktada iki yanlis denendi, ikisi de ayni gun geri alindi:
 
-Uc kenarin ucu birden kapanabildigi icin `Finish` sikismayi da kontrol ediyor:
-"Sikistin" yazip Z ile geri almaya birakiyor. Parca yogunlugu bu yuzden 0.18'den
-0.26'ya cikti - parcalar artik tukenmiyor, labirent olarak is goruyorlar.
+1. *Her parca basilinca kalkiyordu.* Oyun kendi kendini bitiriyordu, ileride lazim
+   olacak renkler yolda harcaniyordu.
+2. *Gerekmeyen renkler duvar yapildi.* Bu sefer yol kesiyordu; Emre'nin istegi acikti,
+   engel olmasin.
+
+Dogrusu: parca sadece GOREVIN ISTEDIGI renkse kalkiyor, geri kalaninin ustune
+biniliyor. Ayni yariya iki ucgen girmiyor, biri digerinin ustunde duruyor.
+
+Dikkat edilecek iki yer: inis yuksekligi parca KALKTIKTAN sonra okunmali (`MePos`
+cagrisi `Swallow`'dan sonra), ve takla hesabi binisi gormemeli - yukseklik ayri bir
+rampa (`tumbleFromLift` / `tumbleToLift`), yoksa kaldirilmis baslangic noktasi donup
+zeminin altina iniyor. Nisan da parcanin ustune cikiyor, yoksa altinda kalip
+gorunmuyor; sari nisan artik "burada parca alirsin" demek, sadece "burada parca var"
+degil. Parca yogunlugu 0.18'den 0.26'ya cikti, parcalar artik tukenmedigi icin.
 
 **Hamle butcesi kaldirildi.** Iki saat olmaz: baski gorevlerden gelecek. Sureli gorevler
 (mesela "40 saniyede mavi") henuz yok, once birlestirme hissi olculecek.
@@ -94,8 +101,9 @@ sabiti degisince kayitli degerler gecersiz oluyor.
 1. Birlestirme hissi telefonda olculecek: kare tamamlandigi an okunuyor mu, tasidigin
    rengi ucgenden anlamak yetiyor mu (ucgen parca rengine boyaniyor - parca saniliyor mu).
 2. Sureli gorevler: bazilari saatli olsun ("40 saniyede mavi"), hepsi degil. Gorev tipleri
-   (tek renk / kare) hazir, geriye sure ve kaybetme kaliyor.
-3. Kaybetme kosulu geri gelecek (sureli gorev kacirilinca). `lost` / `lostText` alanlari
+   (tek renk / kare) hazir, geriye sure ve kaybetme kaliyor. `lost` / `lostText` duruyor
+   ama su an hicbir yerden set edilmiyor.
+
    duruyor ama su an hicbir yerden set edilmiyor.
 4. Masada duran kural adayi: ustunden ayrildigin kare arkanda kapaniyor.
 

@@ -15,11 +15,16 @@ using UnityEngine;
 //
 // Parcanin ustune devrilince onu yok etmiyorsun, RENGINI aliyorsun.
 //
-// GEREKMEYEN RENKLER DUVAR. Ustunden gecip yok edemiyorsun, yolunu onlara gore
-// kuruyorsun. Sebebi basit: gorev degisince o renklere ihtiyacin olacak, yolda
-// harcanmalari oyunu kendi kendine bitiriyordu.
+// GEREKMEYEN PARCANIN USTUNDEN GECERSIN. Yok olmaz, yolunu da kesmez: ucgen
+// onun ustune binip devam eder (bir TriThick yukarida durur). Boylece ayni
+// yariya iki ucgen girmiyor, biri digerinin ustunde duruyor.
 //
-// Kat gorev doldurunca iniliyor (TasksPerLayer), tahtayi supurerek degil.
+// Once bu parcalar basilinca kalkiyordu ve oyun kendi kendini bitiriyordu;
+// sonra duvar yapildi ve bu sefer yol kesiyordu. Ikisi de yanlisti - parca
+// sadece GOREVIN ISTEDIGI renkse kalkiyor, geri kalani yerinde kaliyor ve
+// ileride kendi gorevi geldiginde kullaniliyor.
+//
+// Kat ancak tamamen BOSALINCA iniliyor: her kata konan her renk kullanilacak.
 //
 // Bu yeni bir fizik getirmiyor: yerinde burgu zaten ayni karenin diger
 // yarisina geciriyor ve bir parcanin karsi yarisina basmak baslangictan beri
@@ -32,7 +37,7 @@ using UnityEngine;
 // parcalar seninle beraber dusuyor.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 7;
+	private const int DefaultsVersion = 8;
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -75,7 +80,6 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float FogAmount = 0.8f;
 	[System.NonSerialized] public float HintSize = 0.42f;
 	[System.NonSerialized] public float PieceRatio = 0.26f;
-	[System.NonSerialized] public int TasksPerLayer = 3;
 	[System.NonSerialized] public float TumbleTime = 0.13f;
 	[System.NonSerialized] public float HopHeight = 0.06f;
 	[System.NonSerialized] public float PopTime = 0.22f;
@@ -103,7 +107,7 @@ public class StackPrototype : MonoBehaviour
 		public int A, B;
 		public bool Dove;
 		public int Carry, WantA, WantB, Pair;
-		public int Tasks, Kind, Tone, Need, Got, WOri, LTasks;
+		public int Tasks, Kind, Tone, Need, Got, WOri;
 	}
 
 	private Camera cam;
@@ -143,6 +147,7 @@ public class StackPrototype : MonoBehaviour
 	private Vector3 tumbleFromPos;
 	private Quaternion tumbleFromRot;
 	private int pendingCx, pendingCy, pendingOri;
+	private float tumbleFromLift, tumbleToLift;
 	private int takeA, takeB;
 
 	private bool dropping;
@@ -181,7 +186,6 @@ public class StackPrototype : MonoBehaviour
 	private int wantA = -1;
 	private int wantB = -1;
 	private int wantOri;
-	private int layerTasks;
 	private float callSlide = 1f;
 	private readonly int[] tonePool = new int[PieceTone.Length];
 	private readonly int[] toneCand = new int[PieceTone.Length];
@@ -444,23 +448,27 @@ public class StackPrototype : MonoBehaviour
 		return Shape(lay, nx, ny);
 	}
 
-	// Gorevin istemedigi her parca DUVAR. Ulasilabilirlik hesabi bunu gormuyor
-	// (tahtanin sabit sekli ile oyun sirasindaki durum ayri seyler), bu yuzden
-	// Landing'in icine konmuyor; sadece hamle ve nisan tarafinda soruluyor.
-	private bool Open(int nx, int ny, int no)
+	// O yaride kaldirilacak parca var mi. Kare gorevinde sadece TASINACAK renk
+	// kalkiyor; esi yerinde kalmali, yoksa oyuncu kendi hedefini yolda yiyor.
+	// Gorevin istemedigi parca kalkmiyor ama yol da kesmiyor, ustune biniliyor.
+	private int Pick(int nx, int ny, int no)
 	{
-		return Takeable(occ[myLay, nx, ny, no] - 1)
-			&& Takeable(occ[myLay, nx, ny, no ^ 1] - 1)
-			&& Takeable(occ[myLay, nx, ny, no ^ 2] - 1);
+		int i = occ[myLay, nx, ny, no] - 1;
+		if (i < 0)
+			return -1;
+
+		bool want = objKind == 0 ? pieces[i].Tone == objTone : pieces[i].Tone == wantA;
+		return want ? i : -1;
 	}
 
-	// Kare gorevinde sadece TASINACAK renk basilabilir; esi tahtada kalmali,
-	// yoksa oyuncu kendi hedefini yolda yiyor.
-	private bool Takeable(int i)
+	// Ustune binilen parca duruyor demek; iki ucgen ayni yukseklikte ust uste
+	// durursa z-fighting basliyor.
+	private Vector3 MePos(int lay, int cx, int cy, int ori)
 	{
-		if (i < 0)
-			return true;
-		return objKind == 0 ? pieces[i].Tone == objTone : pieces[i].Tone == wantA;
+		Vector3 p = StateToPos(lay, cx, cy, ori);
+		if (occ[lay, cx, cy, ori] != 0)
+			p.y += TriThick;
+		return p;
 	}
 
 	// --- kurulum ---
@@ -559,7 +567,7 @@ public class StackPrototype : MonoBehaviour
 		}
 
 		me = MakeTri("Me", triMesh, matMe, board);
-		me.position = StateToPos(myLay, myCx, myCy, myOri);
+		me.position = MePos(myLay, myCx, myCy, myOri);
 		me.rotation = StateToRot(myOri);
 
 		hints = new Transform[MoveCount];
@@ -583,7 +591,6 @@ public class StackPrototype : MonoBehaviour
 
 		steps = 0;
 		tasks = 0;
-		layerTasks = 0;
 		carry = -1;
 		objKind = -1;
 		objTone = -1;
@@ -862,7 +869,7 @@ public class StackPrototype : MonoBehaviour
 		for (int m = 0; m < 2; m++)
 		{
 			Target(myCx, myCy, myOri, m, out int nx, out int ny, out int _);
-			if (nx == wx && ny == wy && Landing(myLay, myCx, myCy, myOri, m, out int lx2, out int ly2, out int lo2) && Open(lx2, ly2, lo2))
+			if (nx == wx && ny == wy && Landing(myLay, myCx, myCy, myOri, m, out _, out _, out _))
 				return m;
 		}
 		return -1;
@@ -890,7 +897,7 @@ public class StackPrototype : MonoBehaviour
 
 		for (int m = 0; m < MoveCount; m++)
 		{
-			if (!Landing(myLay, myCx, myCy, myOri, m, out int nx, out int ny, out int no) || !Open(nx, ny, no))
+			if (!Landing(myLay, myCx, myCy, myOri, m, out int nx, out int ny, out int no))
 				continue;
 
 			float rx = nx + (no & 1);
@@ -947,29 +954,31 @@ public class StackPrototype : MonoBehaviour
 	{
 		if (!Landing(myLay, myCx, myCy, myOri, m, out pendingCx, out pendingCy, out pendingOri))
 			return;
-		if (!Open(pendingCx, pendingCy, pendingOri))
-			return;
 
-		// Inis yerini fiziksel olarak kapatan her parca kalkiyor: ya tek yarim,
-		// ya da kareyi ters yonde bolen karsi capraz ikisi.
-		takeA = occ[myLay, pendingCx, pendingCy, pendingOri] - 1;
+		takeA = Pick(pendingCx, pendingCy, pendingOri);
 		takeB = -1;
-		if (takeA < 0)
+		if (takeA < 0 && occ[myLay, pendingCx, pendingCy, pendingOri] == 0)
 		{
-			takeA = occ[myLay, pendingCx, pendingCy, pendingOri ^ 1] - 1;
-			takeB = occ[myLay, pendingCx, pendingCy, pendingOri ^ 2] - 1;
+			takeA = Pick(pendingCx, pendingCy, pendingOri ^ 1);
+			takeB = Pick(pendingCx, pendingCy, pendingOri ^ 2);
 		}
+
+		// Kalkmayacak bir parcanin ustune biniyorsak inis bir kat yukarida.
+		tumbleFromLift = occ[myLay, myCx, myCy, myOri] != 0 ? TriThick : 0f;
+		tumbleToLift = occ[myLay, pendingCx, pendingCy, pendingOri] != 0 && takeA < 0 ? TriThick : 0f;
 
 		history.Add(new Move
 		{
 			Lay = myLay, Cx = myCx, Cy = myCy, Ori = myOri, A = takeA, B = takeB, Dove = false,
 			Carry = carry, WantA = wantA, WantB = wantB, Pair = -1,
 			Tasks = tasks, Kind = objKind, Tone = objTone, Need = objNeed, Got = objGot,
-			WOri = wantOri, LTasks = layerTasks
+			WOri = wantOri
 		});
 
 		Swing(myLay, myCx, myCy, myOri, m, out tumblePivot, out tumbleAxis);
-		tumbleFromPos = me.position;
+		// Takla hesabi binisi gormemeli: yukseklik ayri bir rampa olarak ekleniyor,
+		// yoksa kaldirilmis baslangic noktasi donup zeminin ALTINA iniyor.
+		tumbleFromPos = StateToPos(myLay, myCx, myCy, myOri);
 		tumbleFromRot = me.rotation;
 		tumbleT = 0f;
 		tumbling = true;
@@ -988,7 +997,8 @@ public class StackPrototype : MonoBehaviour
 		float lift = Mathf.Sin(e * Mathf.PI);
 
 		var rot = Quaternion.AngleAxis(180f * e, tumbleAxis);
-		me.position = tumblePivot + rot * (tumbleFromPos - tumblePivot) + Vector3.up * (lift * HopHeight);
+		me.position = tumblePivot + rot * (tumbleFromPos - tumblePivot)
+			+ Vector3.up * (lift * HopHeight + Mathf.Lerp(tumbleFromLift, tumbleToLift, e));
 		me.rotation = rot * tumbleFromRot;
 
 		if (t < 1f)
@@ -998,7 +1008,6 @@ public class StackPrototype : MonoBehaviour
 		myCx = pendingCx;
 		myCy = pendingCy;
 		myOri = pendingOri;
-		me.position = StateToPos(myLay, myCx, myCy, myOri);
 		me.rotation = StateToRot(myOri);
 
 		// Parca yok olmuyor, rengi sana geciyor. Tek renk tasiniyor: yenisini
@@ -1008,6 +1017,10 @@ public class StackPrototype : MonoBehaviour
 		Swallow(takeA);
 		Swallow(takeB);
 		TintMe();
+
+		// Yukseklik parca kalktiktan SONRA okunuyor: kalkan parcanin ustune
+		// binmis gibi havada kalmamak icin.
+		me.position = MePos(myLay, myCx, myCy, myOri);
 
 		// Tek renk gorevi: ustune bastigin her dogru renk sayiliyor.
 		if (objKind == 0 && takeA >= 0 && pieces[takeA].Tone == objTone)
@@ -1033,9 +1046,9 @@ public class StackPrototype : MonoBehaviour
 			CompleteTask();
 		}
 
-		// Kat artik supurerek degil GOREV doldurarak bitiyor. objKind < 0 ise
-		// katta kurulabilecek gorev kalmamis demektir, orada tutmanin anlami yok.
-		if ((layerTasks >= TasksPerLayer || objKind < 0) && myLay < Layers - 1)
+		// Kat ancak bosalinca bitiyor. objKind < 0 ise katta kurulabilecek gorev
+		// kalmamis demektir (tek parca, tek renk), orada tutmanin anlami yok.
+		if ((alive[myLay] == 0 || objKind < 0) && myLay < Layers - 1)
 		{
 			Dive();
 			return;
@@ -1052,27 +1065,13 @@ public class StackPrototype : MonoBehaviour
 
 	private void Finish()
 	{
-		if (myLay == Layers - 1 && (layerTasks >= TasksPerLayer || objKind < 0))
-		{
+		if (myLay == Layers - 1 && (alive[myLay] == 0 || objKind < 0))
 			solved = true;
-			return;
-		}
-
-		// Gerekmeyen renkler duvar oldugu icin uc kenarin ucu birden kapanabilir.
-		// Donmus bir oyun yerine durumu soyluyoruz; Z ile bir onceki hamleye
-		// donup baska yoldan gidiliyor.
-		for (int m = 0; m < MoveCount; m++)
-			if (Landing(myLay, myCx, myCy, myOri, m, out int nx, out int ny, out int no) && Open(nx, ny, no))
-				return;
-
-		lost = true;
-		lostText = "Sikistin";
 	}
 
 	private void CompleteTask()
 	{
 		tasks++;
-		layerTasks++;
 		NextTask();
 	}
 
@@ -1228,7 +1227,6 @@ public class StackPrototype : MonoBehaviour
 		// Oyuncu once yerlesiyor ki dusen parca onun yarisina konmasin.
 		myLay = to;
 		activeLay = to;
-		layerTasks = 0;
 
 		for (int i = 0; i < pieceCount; i++)
 		{
@@ -1262,7 +1260,7 @@ public class StackPrototype : MonoBehaviour
 		fogSheet[to].gameObject.SetActive(false);
 
 		meDropFrom = me.position;
-		meDropTo = StateToPos(to, myCx, myCy, myOri);
+		meDropTo = MePos(to, myCx, myCy, myOri);
 		dropLay = from;
 		dropT = 0f;
 		dropping = true;
@@ -1370,14 +1368,13 @@ public class StackPrototype : MonoBehaviour
 		objNeed = mv.Need;
 		objGot = mv.Got;
 		wantOri = mv.WOri;
-		layerTasks = mv.LTasks;
 		callSlide = 1f;
 		TintMe();
 
 		myCx = mv.Cx;
 		myCy = mv.Cy;
 		myOri = mv.Ori;
-		me.position = StateToPos(myLay, myCx, myCy, myOri);
+		me.position = MePos(myLay, myCx, myCy, myOri);
 		me.rotation = StateToRot(myOri);
 		steps--;
 		lost = false;
@@ -1414,15 +1411,19 @@ public class StackPrototype : MonoBehaviour
 			int nx = 0;
 			int ny = 0;
 			int no = 0;
-			bool ok = live && Landing(myLay, myCx, myCy, myOri, m, out nx, out ny, out no) && Open(nx, ny, no);
+			bool ok = live && Landing(myLay, myCx, myCy, myOri, m, out nx, out ny, out no);
 			hints[m].gameObject.SetActive(ok);
 			if (!ok)
 				continue;
 
-			bool take = occ[myLay, nx, ny, no] != 0 || occ[myLay, nx, ny, no ^ 1] != 0 || occ[myLay, nx, ny, no ^ 2] != 0;
+			// Sari nisan "buraya basarsan parca alirsin" demek; sadece ustunden
+			// gecilecek bir parca icin yanmiyor, yoksa isaret yaniltiyor.
+			bool take = Pick(nx, ny, no) >= 0;
 			hints[m].GetComponent<MeshRenderer>().sharedMaterial = take ? matHintTake : matHint;
 			// Isaret zeminin hemen uzerine yapisiyor; havada asili kalirsa yine cisim gibi okunuyor.
-			hints[m].position = StateToPos(myLay, nx, ny, no) + Vector3.down * (TriThick * 0.5f - 0.006f);
+			// Parcanin ustune binilecekse nisan da onun uzerine cikiyor, yoksa
+			// parcanin altinda kalip gorunmuyor.
+			hints[m].position = MePos(myLay, nx, ny, no) + Vector3.down * (TriThick * 0.5f - 0.006f);
 			hints[m].rotation = StateToRot(no);
 		}
 	}
@@ -1539,12 +1540,11 @@ public class StackPrototype : MonoBehaviour
 		for (int l = 0; l < Layers; l++)
 			left += alive[l];
 
-		GUI.Label(new Rect(16f * s, 10f * s, 700f * s, 32f * s),
-			"Gorev: " + layerTasks + " / " + TasksPerLayer + "     Toplam: " + tasks + "     Hamle: " + steps, big);
+		GUI.Label(new Rect(16f * s, 10f * s, 700f * s, 32f * s), "Gorev: " + tasks + "     Hamle: " + steps, big);
 		GUI.Label(new Rect(16f * s, 40f * s, 700f * s, 32f * s),
 			"Kat " + (myLay + 1) + " / " + Layers + "     Bu katta: " + alive[myLay] + "     Kalan: " + left, big);
 		if (myLay < Layers - 1)
-			GUI.Label(new Rect(16f * s, 70f * s, 700f * s, 32f * s), "Gorevler bitince zemin cekiliyor, asagi iniyorsun.", big);
+			GUI.Label(new Rect(16f * s, 70f * s, 700f * s, 32f * s), "Kat bosalinca zemin cekiliyor, asagi iniyorsun.", big);
 
 		// Gorev yandan kayarak giriyor: degistigi an goz sayiya degil harekete
 		// takiliyor. Tek renk gorevi tek ucgen, kare gorevi iki yarim.
@@ -1602,7 +1602,6 @@ public class StackPrototype : MonoBehaviour
 		SliderInt(ref TopRadius, 1, 5, "Ust kat yaricapi", x, ref y, w, s, true);
 		SliderInt(ref RadiusStep, 1, 2, "Yaricap artisi", x, ref y, w, s, true);
 		Slider(ref PieceRatio, 0.05f, 0.6f, "Parca yogunlugu", x, ref y, w, s, true);
-		SliderInt(ref TasksPerLayer, 1, 8, "Kat basina gorev", x, ref y, w, s, true);
 		Slider(ref LayerGap, 0.2f, 1.6f, "Kat araligi", x, ref y, w, s, true);
 		Slider(ref SlabRatio, 0.1f, 1.6f, "Kat govde yuksekligi", x, ref y, w, s, true);
 		Slider(ref FogAmount, 0f, 0.93f, "En alt kat sisi", x, ref y, w, s, true);
@@ -1650,7 +1649,6 @@ public class StackPrototype : MonoBehaviour
 			FogAmount = 0.8f;
 			HintSize = 0.42f;
 			PieceRatio = 0.26f;
-			TasksPerLayer = 3;
 			Build();
 		}
 		y += 42f * s;
@@ -1659,7 +1657,7 @@ public class StackPrototype : MonoBehaviour
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Parcaya basinca rengini alirsin");
 		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Gerekmeyen renkler duvar, etrafindan dolas");
+		GUI.Label(new Rect(x, y, w, 24f * s), "Gerekmeyen parcanin ustunden gecersin");
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Karede rozetteki dizilise bas");
 		y += 24f * s;
@@ -1707,7 +1705,6 @@ public class StackPrototype : MonoBehaviour
 		TopRadius = PlayerPrefs.GetInt("stk_r0", TopRadius);
 		RadiusStep = PlayerPrefs.GetInt("stk_rs", RadiusStep);
 		PieceRatio = PlayerPrefs.GetFloat("stk_pr", PieceRatio);
-		TasksPerLayer = PlayerPrefs.GetInt("stk_tpl", TasksPerLayer);
 		LayerGap = PlayerPrefs.GetFloat("stk_gap", LayerGap);
 		SlabRatio = PlayerPrefs.GetFloat("stk_slab", SlabRatio);
 		FogAmount = PlayerPrefs.GetFloat("stk_fog", FogAmount);
@@ -1732,7 +1729,6 @@ public class StackPrototype : MonoBehaviour
 		PlayerPrefs.SetInt("stk_r0", TopRadius);
 		PlayerPrefs.SetInt("stk_rs", RadiusStep);
 		PlayerPrefs.SetFloat("stk_pr", PieceRatio);
-		PlayerPrefs.SetInt("stk_tpl", TasksPerLayer);
 		PlayerPrefs.SetFloat("stk_gap", LayerGap);
 		PlayerPrefs.SetFloat("stk_slab", SlabRatio);
 		PlayerPrefs.SetFloat("stk_fog", FogAmount);
