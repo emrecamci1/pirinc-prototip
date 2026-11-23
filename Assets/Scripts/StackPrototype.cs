@@ -477,7 +477,7 @@ public class StackPrototype : MonoBehaviour
 		// sasirtiyordu; sorun tus secimi degil, sayinin tutmamasiydi.
 		hints = new Transform[MoveCount];
 		hintKey = new TextMesh[MoveCount];
-		var font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+		var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 		for (int i = 0; i < MoveCount; i++)
 		{
 			hints[i] = MakeTri("Hint" + i, hintMesh, matHint, board);
