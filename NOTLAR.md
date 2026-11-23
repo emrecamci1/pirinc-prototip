@@ -30,7 +30,10 @@ Ustte bir GOREV duruyor, yandan kayarak giriyor, iki tipten biri oluyor:
 
 - **Tek renk:** "su renkten 3 tane". Ustune devrildigin her dogru renk sayiliyor,
   rozet tek ucgen olarak cizilir, yaninda `2 / 3` yazar.
-- **Kare:** iki yarim, mesela alt-solda sari + ust-sagda kirmizi. Elinde sari varken
+- **Kare:** iki yarim, mesela alt-solda sari + ust-sagda kirmizi. Rozette DOLU yarim
+  tahtada duran parca, ICI BOS olan senin getirecegin renk - iki renkli duz bir kare
+  hangisini hangisine goturecegini soylemiyordu. Renk eline gectigi an bos yarim
+  doluyor, yazi da "bos yarimi getir"den "yerine bas"a doner. Elinde sari varken
   kirmizi parcanin KARSI YARISINA basarsan kare olusur - ama DIZILIS de tutmali:
   rozette sari alt-soldaysa sen de alt-sol yariya basmis olacaksin (`wantOri`).
   Rozet dort yarim dokusundan (`halfTex[ori]`) ikisiyle ciziliyor, yonelim indisiyle

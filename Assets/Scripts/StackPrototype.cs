@@ -190,6 +190,7 @@ public class StackPrototype : MonoBehaviour
 	private readonly int[] tonePool = new int[PieceTone.Length];
 	private readonly int[] toneCand = new int[PieceTone.Length];
 	private Texture2D[] halfTex;
+	private Texture2D[] edgeTex;
 	private Texture2D upTex;
 	private bool solved;
 	private bool lost;
@@ -218,30 +219,32 @@ public class StackPrototype : MonoBehaviour
 		// Rozet damgalari. Dort yarim, yonelim indisiyle ayni sirada: bit0 dik
 		// acinin sagda olmasi, bit1 ustte olmasi. Doku satiri 0 ekranda ALTTA
 		// durdugu icin doku uzayi tahta uzayiyla ayni yonde, cevirmeye gerek yok.
+		// Her yarimin bir de kenar damgasi var: ici bos cizilen yarim icin.
 		halfTex = new Texture2D[4];
+		edgeTex = new Texture2D[4];
 		for (int k = 0; k < 4; k++)
 		{
 			var tex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+			var rim = new Texture2D(64, 64, TextureFormat.RGBA32, false);
 			tex.filterMode = FilterMode.Bilinear;
+			rim.filterMode = FilterMode.Bilinear;
 			var px = new Color32[64 * 64];
+			var rpx = new Color32[64 * 64];
 			for (int ty = 0; ty < 64; ty++)
 			{
 				for (int tx = 0; tx < 64; tx++)
 				{
-					bool on;
-					switch (k)
-					{
-						case 0: on = tx + ty <= 61; break;
-						case 1: on = ty <= tx - 2; break;
-						case 2: on = ty >= tx + 2; break;
-						default: on = tx + ty >= 65; break;
-					}
+					bool on = InHalf(k, tx, ty);
 					px[ty * 64 + tx] = on ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+					rpx[ty * 64 + tx] = on && OnRim(k, tx, ty) ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
 				}
 			}
 			tex.SetPixels32(px);
 			tex.Apply();
 			halfTex[k] = tex;
+			rim.SetPixels32(rpx);
+			rim.Apply();
+			edgeTex[k] = rim;
 		}
 
 		// Tek renk gorevinin rozeti simetrik bir ucgen: dizilis istemedigi icin
@@ -286,6 +289,29 @@ public class StackPrototype : MonoBehaviour
 		var m = new Material(sh);
 		m.color = c;
 		return m;
+	}
+
+	private static bool InHalf(int k, int tx, int ty)
+	{
+		switch (k)
+		{
+			case 0: return tx + ty <= 61;
+			case 1: return ty <= tx - 2;
+			case 2: return ty >= tx + 2;
+			default: return tx + ty >= 65;
+		}
+	}
+
+	private static bool OnRim(int k, int tx, int ty)
+	{
+		const int b = 8;
+		switch (k)
+		{
+			case 0: return tx <= b || ty <= b || tx + ty >= 61 - b;
+			case 1: return ty <= b || tx >= 63 - b || ty >= tx - 2 - b;
+			case 2: return tx <= b || ty >= 63 - b || ty <= tx + 2 + b;
+			default: return tx >= 63 - b || ty >= 63 - b || tx + ty <= 65 + b;
+		}
 	}
 
 	private static void AddFace(List<Vector3> v, List<Vector3> n, List<int> t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 nrm)
@@ -1559,10 +1585,21 @@ public class StackPrototype : MonoBehaviour
 			var oc = GUI.color;
 			if (objKind == 1)
 			{
-				GUI.color = PieceTone[wantA];
-				GUI.DrawTexture(r, halfTex[wantOri]);
+				// Dolu yarim tahtada DURAN parca, ici bos olan SENIN getirecegin
+				// renk. Iki renkli duz bir kare hangisini hangisine goturecegini
+				// soylemiyordu; en cok takilan yer burasiydi.
 				GUI.color = PieceTone[wantB];
 				GUI.DrawTexture(r, halfTex[wantOri ^ 3]);
+
+				// Renk zaten elindeyse bos yarim doluyor: soru artik hangisini
+				// getirecegin degil, nereye basacagin.
+				var ghost = PieceTone[wantA];
+				if (carry != wantA)
+					ghost.a = 0.28f;
+				GUI.color = ghost;
+				GUI.DrawTexture(r, halfTex[wantOri]);
+				GUI.color = PieceTone[wantA];
+				GUI.DrawTexture(r, edgeTex[wantOri]);
 			}
 			else
 			{
@@ -1572,7 +1609,7 @@ public class StackPrototype : MonoBehaviour
 			GUI.color = oc;
 
 			GUI.Label(new Rect(bx + q + 10f * s, by + 20f * s, 320f * s, 40f * s),
-				objKind == 1 ? "kareyi yap" : objGot + " / " + objNeed, big);
+				objKind == 1 ? carry == wantA ? "yerine bas" : "bos yarimi getir" : objGot + " / " + objNeed, big);
 		}
 
 		if (solved)
@@ -1659,7 +1696,7 @@ public class StackPrototype : MonoBehaviour
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Gerekmeyen parcanin ustunden gecersin");
 		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Karede rozetteki dizilise bas");
+		GUI.Label(new Rect(x, y, w, 24f * s), "Karede ici bos yarim senin rengin");
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Z: geri al (kat icinde)");
 
