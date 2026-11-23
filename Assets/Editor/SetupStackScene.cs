@@ -7,8 +7,33 @@ public static class SetupStackScene
 {
 	private const string ScenePath = "Assets/Scenes/Stack.unity";
 
-	[MenuItem("Pirinç/1 - YIĞIN  (yeni board oyunu)", false, 1)]
-	public static void Setup()
+	[MenuItem("Pirinç/1 - YIĞIN oyunu  (aç)", false, 1)]
+	public static void Open()
+	{
+		if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+			return;
+
+		if (File.Exists(ScenePath))
+			EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+		else
+			Build();
+
+		MakeActive();
+		Debug.Log("YIĞIN açıldı: " + ScenePath + "  —  Play'e bas.");
+	}
+
+	[MenuItem("Pirinç/8 - YIĞIN sahnesini sıfırdan kur", false, 80)]
+	public static void Rebuild()
+	{
+		if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+			return;
+
+		Build();
+		MakeActive();
+		Debug.Log("YIĞIN sahnesi yeniden kuruldu: " + ScenePath);
+	}
+
+	private static void Build()
 	{
 		Directory.CreateDirectory("Assets/Scenes");
 
@@ -22,10 +47,11 @@ public static class SetupStackScene
 		go.AddComponent<StackPrototype>();
 
 		EditorSceneManager.SaveScene(scene, ScenePath);
+	}
 
+	private static void MakeActive()
+	{
 		PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
 		EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-
-		Debug.Log("Yığın sahnesi kuruldu: " + ScenePath + "  —  Play'e bas.");
 	}
 }
