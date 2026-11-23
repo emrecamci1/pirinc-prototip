@@ -133,12 +133,6 @@ public class StackPrototype : MonoBehaviour
 	private readonly List<Vector3> dropTo = new List<Vector3>();
 
 	private Transform[] hints;
-	private TextMesh[] hintKey;
-	private readonly int[] keyToMove = { -1, -1, -1 };
-	private readonly int[] sortMove = new int[MoveCount];
-	private readonly float[] sortAt = new float[MoveCount];
-	private static readonly string[] KeyName = { "A", "S", "D" };
-	private static readonly KeyCode[] KeyCodes = { KeyCode.A, KeyCode.S, KeyCode.D };
 	private readonly List<int> popping = new List<int>();
 	private readonly List<float> popT = new List<float>();
 	private readonly List<Move> history = new List<Move>();
@@ -471,29 +465,11 @@ public class StackPrototype : MonoBehaviour
 		me.position = StateToPos(myLay, myCx, myCy, myOri);
 		me.rotation = StateToRot(myOri);
 
-		// Klavye ucgenin seklini zorlamiyor: uc kenar, uc tus. Hangi tusun hangi
-		// nisan oldugu nisanin uzerinde yaziyor, yani eslesme akilda tutulmuyor
-		// goruluyor. Dort ok tusuyla uc kenarli bir sekli surmek bastan beri
-		// sasirtiyordu; sorun tus secimi degil, sayinin tutmamasiydi.
 		hints = new Transform[MoveCount];
-		hintKey = new TextMesh[MoveCount];
-		var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 		for (int i = 0; i < MoveCount; i++)
 		{
 			hints[i] = MakeTri("Hint" + i, hintMesh, matHint, board);
 			hints[i].gameObject.SetActive(false);
-
-			var kg = new GameObject("Key" + i);
-			kg.transform.SetParent(board, false);
-			var tm = kg.AddComponent<TextMesh>();
-			tm.font = font;
-			tm.fontSize = 64;
-			tm.characterSize = 0.05f;
-			tm.anchor = TextAnchor.MiddleCenter;
-			tm.color = new Color(0.12f, 0.12f, 0.14f);
-			kg.GetComponent<MeshRenderer>().sharedMaterial = font.material;
-			kg.SetActive(false);
-			hintKey[i] = tm;
 		}
 
 		var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -748,10 +724,6 @@ public class StackPrototype : MonoBehaviour
 
 	private int ReadMove()
 	{
-		int key = KeyMove();
-		if (key >= 0)
-			return key;
-
 		if (showPanel && Input.mousePosition.x > panelLeft)
 			return -1;
 
@@ -773,16 +745,6 @@ public class StackPrototype : MonoBehaviour
 		return TapMove(Input.mousePosition);
 	}
 
-	// Fare eldeyken ok tuslari uzak kaliyor; sol el icin A S D E ayni islerde.
-	// Tuslar ekranda soldan saga siralanmis nisanlara bagli; eslesmeyi her kare
-	// UpdateHints kuruyor.
-	private int KeyMove()
-	{
-		for (int k = 0; k < 3; k++)
-			if (Input.GetKeyDown(KeyCodes[k]))
-				return keyToMove[k];
-		return -1;
-	}
 
 	private int Steer(int dir)
 	{
@@ -802,10 +764,17 @@ public class StackPrototype : MonoBehaviour
 
 	// Telefonda parmak nisanin tam ustune denk gelmez, ustelik dokundugu yeri
 	// kendisi kapatir. Bu yuzden karenin icinde mi diye bakmiyoruz: bol bir
-	// yaricap icindeki EN YAKIN nisan seciliyor. Ilk uyani degil en yakini,
-	// yoksa iki nisan yan yanayken hangisinin secildigi belirsiz kaliyor.
-	// Yaricapin disina dokunmak hicbir sey yapmaz; uzaga basinca ucgenin
-	// kendiliginden yurumesi daha once en cok sikayet edilen seydi.
+	// yaricap icindeki EN YAKIN nisan seciliyor. Yaricapin disina dokunmak
+	// hicbir sey yapmaz; uzaga basinca ucgenin kendiliginden yurumesi daha
+	// once en cok sikayet edilen seydi.
+	//
+	// Olcu noktasi StateToPos OLAMAZ: o bir durumun dik aci kosesini verir,
+	// iki komsu takla da ayni kose etrafinda dondugu icin 0 ve 1 hamlelerinin
+	// StateToPos degeri birebir ayni noktadir. Nisanlar ekranda ayri yerlerde
+	// gorunur (mesh o koseye tutturulup farkli aciyla dondurulur) ama olcum
+	// onlari ust uste sanirdi; esitlikte ilki kazandigi icin 1 numarali hamle
+	// dokunusla hic secilemiyordu. Olcu noktasi artik nisanin GORUNEN agirlik
+	// merkezi: dik aci kosesinden iki bacak yonunde birer bolu uc.
 	private int TapMove(Vector3 screen)
 	{
 		float r = Mathf.Max(Screen.width, Screen.height) * TapRadius;
@@ -818,7 +787,12 @@ public class StackPrototype : MonoBehaviour
 			if (!Landing(myLay, myCx, myCy, myOri, m, out int nx, out int ny, out int no))
 				continue;
 
-			Vector3 sp = cam.WorldToScreenPoint(StateToPos(myLay, nx, ny, no));
+			float rx = nx + (no & 1);
+			float ry = ny + ((no >> 1) & 1);
+			float lx = (no & 1) == 0 ? 1f : -1f;
+			float ly = ((no >> 1) & 1) == 0 ? 1f : -1f;
+
+			Vector3 sp = cam.WorldToScreenPoint(CornerToWorld(myLay, rx + lx / 3f, ry + ly / 3f));
 			float d = (new Vector2(sp.x, sp.y) - tap).sqrMagnitude;
 			if (d >= best)
 				continue;
@@ -1136,10 +1110,6 @@ public class StackPrototype : MonoBehaviour
 			return;
 
 		bool live = Hints && !tumbling && !dropping && !solved && !lost;
-		for (int k = 0; k < 3; k++)
-			keyToMove[k] = -1;
-
-		int n = 0;
 		for (int m = 0; m < MoveCount; m++)
 		{
 			int nx = 0;
@@ -1147,7 +1117,6 @@ public class StackPrototype : MonoBehaviour
 			int no = 0;
 			bool ok = live && Landing(myLay, myCx, myCy, myOri, m, out nx, out ny, out no);
 			hints[m].gameObject.SetActive(ok);
-			hintKey[m].gameObject.SetActive(ok);
 			if (!ok)
 				continue;
 
@@ -1156,35 +1125,6 @@ public class StackPrototype : MonoBehaviour
 			// Isaret zeminin hemen uzerine yapisiyor; havada asili kalirsa yine cisim gibi okunuyor.
 			hints[m].position = StateToPos(myLay, nx, ny, no) + Vector3.down * (TriThick * 0.5f - 0.006f);
 			hints[m].rotation = StateToRot(no);
-
-			sortMove[n] = m;
-			sortAt[n] = cam.WorldToScreenPoint(hints[m].position).x;
-			n++;
-		}
-
-		// Gorunen nisanlar ekranda soldan saga siralanip tuslara dagitiliyor.
-		// Hangi tusun nereye goturdugu ezberlenmiyor, nisanin uzerinde okunuyor;
-		// bu yuzden siralamanin kendisinin tahmin edilebilir olmasi gerekmiyor.
-		for (int i = 1; i < n; i++)
-		{
-			for (int j = i; j > 0 && sortAt[j] < sortAt[j - 1]; j--)
-			{
-				float fa = sortAt[j];
-				sortAt[j] = sortAt[j - 1];
-				sortAt[j - 1] = fa;
-				int mi = sortMove[j];
-				sortMove[j] = sortMove[j - 1];
-				sortMove[j - 1] = mi;
-			}
-		}
-
-		for (int i = 0; i < n; i++)
-		{
-			int m = sortMove[i];
-			keyToMove[i] = m;
-			hintKey[m].text = KeyName[i];
-			hintKey[m].transform.position = hints[m].position + Vector3.up * 0.18f;
-			hintKey[m].transform.rotation = cam.transform.rotation;
 		}
 	}
 
@@ -1381,8 +1321,6 @@ public class StackPrototype : MonoBehaviour
 		y += 42f * s;
 
 		GUI.Label(new Rect(x, y, w, 24f * s), "Nisana dokun (telefonda da ayni)");
-		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "A S D: nisanlar soldan saga");
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Z: geri al (kat icinde)");
 
