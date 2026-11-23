@@ -20,8 +20,26 @@ Sahne yoksa veya bozuksa menuden tekrar kur; `Assets/Editor/SetupStackScene.cs` 
 
 ## YIGIN (aktif prototip)
 
-Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz, uzerinden
-gectigimiz renkleri topluyoruz. Bir kat tamamen temizlenince asagiki kata iniyoruz.
+Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz. Bir kat
+tamamen temizlenince asagiki kata iniyoruz, o katta birakilanlar bizimle dusuyor.
+
+**Hedef (2026-11-23):** parcanin ustune devrilince onu yok etmiyorsun, RENGINI
+aliyorsun - ucgen o renge donuyor. Tek renk tasiniyor, yenisini almak eskisini siler.
+Ustte istenen bir KARE duruyor (iki yarim, mesela sari + kirmizi) ve yandan kayarak
+giriyor. Elinde sari varken kirmizi parcanin KARSI YARISINA basarsan orada tam bir
+sari-kirmizi kare olusur, istenen tamamlanir ve yeni cift gelir.
+
+Bu neden oturuyor: 2 numarali hamle (yerinde burgu) zaten ayni karenin diger yarisina
+geciriyor, ve bir parcanin karsi yarisina basmak bastan beri serbestti - parca yerinde
+kaliyordu, ikiniz tam bir kare oluyordunuz, ama hicbir anlami yoktu. Yeni fizik yok,
+var olan bos duruma anlam verildi.
+
+Istenen cift her zaman o katta GERCEKTEN duran renklerden seciliyor; renklerden biri
+tukenirse cift aninda yenileniyor. Oyuncunun hicbir hamleyle duzeltemeyecegi bir hedef
+ekranda durmamali.
+
+**Hamle butcesi kaldirildi.** Iki saat olmaz: baski gorevlerden gelecek. Sureli gorevler
+(mesela "40 saniyede mavi") henuz yok, once birlestirme hissi olculecek.
 
 **Hareket:** 3 kenar = 3 hamle. 0 = yatay kenardan dikey komsuya, 1 = dikey kenardan
 yatay komsuya, 2 = hipotenus uzerinde yerinde donme.
@@ -36,16 +54,22 @@ dogrudan verilemez; gorunen solma `V(L)` verilip levha alfasi `a = 1 - (1-V(L))/
 olarak turetiliyor. 3 katta FogAmount 0.8 -> %0 / %50 / %80. Basilan kat her zaman net.
 
 **Kumanda:** nisana dokun (telefonda da ayni). En yakin nisan seciliyor, `TapRadius`
-yaricapi icinde; disina dokunmak hicbir sey yapmiyor. Masaustu testinde A S D tuslari,
-nisanlar soldan saga; harf nisanin uzerinde yaziyor.
+yaricapi icinde; disina dokunmak hicbir sey yapmiyor. Harfler ve klavye kaldirildi.
+Olcu noktasi nisanin GORUNEN agirlik merkezi - `StateToPos` dik aci kosesini verdigi
+icin 0 ve 1 hamleleri orada ust uste biniyordu ve 1 hic secilemiyordu.
 
 **Ayarlar:** oyun icinde IMGUI slider paneli. PlayerPrefs'e yaziyor, `DefaultsVersion`
 sabiti degisince kayitli degerler gecersiz oluyor.
 
 ## Siradaki
 
-Oyun hissi test edilecek. Sonrasinda engel degil **kural** eklenecek (Emre'nin tercihi).
-Masadaki aday: ustunden ayrildigin kare arkanda kapaniyor.
+1. Birlestirme hissi telefonda olculecek: kare tamamlandigi an okunuyor mu, tasidigin
+   rengi ucgenden anlamak yetiyor mu (ucgen parca rengine boyaniyor - parca saniliyor mu).
+2. Gorev listesi: kat basina birden fazla gorev, farkli tipler. Sadece renk toplama degil,
+   birlestirme de gorev olabilsin. Bazilari sureli ("40 saniyede mavi"), hepsi degil.
+3. Kaybetme kosulu geri gelecek (sureli gorev kacirilinca). `lost` / `lostText` alanlari
+   duruyor ama su an hicbir yerden set edilmiyor.
+4. Masada duran kural adayi: ustunden ayrildigin kare arkanda kapaniyor.
 
 ## Iki makine
 
