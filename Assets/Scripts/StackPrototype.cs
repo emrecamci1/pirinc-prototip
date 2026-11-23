@@ -13,7 +13,7 @@ using UnityEngine;
 // gercek bir karar var: temizleyip mi ineyim, yoksa hemen mi dalayim.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 4;
+	private const int DefaultsVersion = 5;
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -66,7 +66,7 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float Inset = 0.07f;
 	[System.NonSerialized] public float FloorInset = 0.11f;
 	[System.NonSerialized] public float CamPitch = 52f;
-	[System.NonSerialized] public float CamZoom = 1.08f;
+	[System.NonSerialized] public float CamZoom = 1f;
 	[System.NonSerialized] public bool Hints = true;
 	[System.NonSerialized] public float SwipeMin = 90f;
 	[System.NonSerialized] public float TapRadius = 0.09f;
@@ -1211,9 +1211,15 @@ public class StackPrototype : MonoBehaviour
 
 		// Egik bakista tahtanin derinligi ekranda sin(egim) kadar, yiginin
 		// yuksekligi ise cos(egim) kadar yer kapliyor; ikisini de sigdiriyoruz.
+		//
+		// Dik telefon ekraninda her zaman needH kazanir: tahta ekranin iki
+		// kenarina tam deger, bos kalan yer altta ve ustte kalir. Yani CamZoom
+		// 1'in altina inmeden daha fazla yakinlasmanin yolu yok, inince de
+		// tahtanin kenarlari kirpilir. Sabit pay bu yuzden kucuk tutuluyor;
+		// 1.5 iken telefonda tahta gereksiz yere uzak duruyordu.
 		float needH = span / (vt * Mathf.Max(0.2f, cam.aspect));
 		float needV = (span * Mathf.Sin(p) + stack * 0.5f * Mathf.Cos(p)) / vt;
-		float dist = Mathf.Max(needH, needV) * CamZoom + 1.5f;
+		float dist = Mathf.Max(needH, needV) * CamZoom + 0.5f;
 
 		focusY = Mathf.SmoothDamp(focusY, LayerY(activeLay), ref focusVelY, 0.25f);
 		Vector3 focus = new Vector3(0f, focusY, 0f);
