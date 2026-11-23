@@ -20,8 +20,9 @@ Sahne yoksa veya bozuksa menuden tekrar kur; `Assets/Editor/SetupStackScene.cs` 
 
 ## YIGIN (aktif prototip)
 
-Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz. Bir kat
-tamamen temizlenince asagiki kata iniyoruz, o katta birakilanlar bizimle dusuyor.
+Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz. Kat GOREV
+doldurunca asagiki kata iniyoruz (`TasksPerLayer`, varsayilan 3), o katta birakilanlar
+bizimle dusuyor. Tahtayi supurmek diye bir sey yok.
 
 **Hedef (2026-11-23):** parcanin ustune devrilince onu yok etmiyorsun, RENGINI
 aliyorsun - ucgen o renge donuyor. Tek renk tasiniyor, yenisini almak eskisini siler.
@@ -30,8 +31,15 @@ Ustte bir GOREV duruyor, yandan kayarak giriyor, iki tipten biri oluyor:
 
 - **Tek renk:** "su renkten 3 tane". Ustune devrildigin her dogru renk sayiliyor,
   rozet tek ucgen olarak cizilir, yaninda `2 / 3` yazar.
-- **Kare:** iki yarim, mesela sari + kirmizi. Elinde sari varken kirmizi parcanin
-  KARSI YARISINA basarsan orada tam bir kare olusur. Rozet iki yarim olarak cizilir.
+- **Kare:** iki yarim, mesela alt-solda sari + ust-sagda kirmizi. Elinde sari varken
+  kirmizi parcanin KARSI YARISINA basarsan kare olusur - ama DIZILIS de tutmali:
+  rozette sari alt-soldaysa sen de alt-sol yariya basmis olacaksin (`wantOri`).
+  Rozet dort yarim dokusundan (`halfTex[ori]`) ikisiyle ciziliyor, yonelim indisiyle
+  ayni sirada. Doku satiri 0 ekranda altta durdugu icin doku uzayi tahta uzayiyla
+  ayni yonde - cevirmeye gerek yok.
+  Gorev tahtada duran GERCEK bir yerlesimden uretiliyor (`MateSpot`): karsi yarisi bos
+  ve ulasilabilir bir parca secilip dizilis ondan okunuyor. Rastgele dizilis istemek
+  cozulemeyen gorev demekti.
 
 Tip her gorevde yeniden ve rastgele seciliyor (yarisi kare, yarisi tek renk; katta
 tek renk kalmissa zorunlu olarak tek renk). Donusumlu olsaydi hep kare istenirse oyun
@@ -45,6 +53,18 @@ var olan bos duruma anlam verildi.
 Gorev her zaman o katta GERCEKTEN duran renklerden kuruluyor ve tamamlanamaz hale
 gelirse (`TaskPossible`) aninda yenileniyor. Oyuncunun hicbir hamleyle duzeltemeyecegi
 bir hedef ekranda durmamali.
+
+**Gerekmeyen renkler DUVAR (`Open` / `Takeable`).** Ustunden gecip yok edemiyorsun,
+yolunu onlara gore kuruyorsun. Eskiden her parca uzerine basilinca kalkiyordu ve bu
+oyunu kendi kendine bitiriyordu: ileride lazim olacak renkler yolda harcaniyordu.
+Kare gorevinde sadece TASINACAK renk basilabilir, esi tahtada kalmali.
+
+Kontrol `Landing`'in icinde degil: ulasilabilirlik hesabi tahtanin sabit seklini
+cikariyor, duvarlar ise oyun sirasinda degisiyor. `MarkReach` duvarlari gormemeli.
+
+Uc kenarin ucu birden kapanabildigi icin `Finish` sikismayi da kontrol ediyor:
+"Sikistin" yazip Z ile geri almaya birakiyor. Parca yogunlugu bu yuzden 0.18'den
+0.26'ya cikti - parcalar artik tukenmiyor, labirent olarak is goruyorlar.
 
 **Hamle butcesi kaldirildi.** Iki saat olmaz: baski gorevlerden gelecek. Sureli gorevler
 (mesela "40 saniyede mavi") henuz yok, once birlestirme hissi olculecek.
