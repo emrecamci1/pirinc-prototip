@@ -25,18 +25,26 @@ tamamen temizlenince asagiki kata iniyoruz, o katta birakilanlar bizimle dusuyor
 
 **Hedef (2026-11-23):** parcanin ustune devrilince onu yok etmiyorsun, RENGINI
 aliyorsun - ucgen o renge donuyor. Tek renk tasiniyor, yenisini almak eskisini siler.
-Ustte istenen bir KARE duruyor (iki yarim, mesela sari + kirmizi) ve yandan kayarak
-giriyor. Elinde sari varken kirmizi parcanin KARSI YARISINA basarsan orada tam bir
-sari-kirmizi kare olusur, istenen tamamlanir ve yeni cift gelir.
+
+Ustte bir GOREV duruyor, yandan kayarak giriyor, iki tipten biri oluyor:
+
+- **Tek renk:** "su renkten 3 tane". Ustune devrildigin her dogru renk sayiliyor,
+  rozet tek ucgen olarak cizilir, yaninda `2 / 3` yazar.
+- **Kare:** iki yarim, mesela sari + kirmizi. Elinde sari varken kirmizi parcanin
+  KARSI YARISINA basarsan orada tam bir kare olusur. Rozet iki yarim olarak cizilir.
+
+Tip her gorevde yeniden ve rastgele seciliyor (yarisi kare, yarisi tek renk; katta
+tek renk kalmissa zorunlu olarak tek renk). Donusumlu olsaydi hep kare istenirse oyun
+tek gorevli gibi okunuyordu, hep tek renk istenirse birlestirme hic kullanilmiyordu.
 
 Bu neden oturuyor: 2 numarali hamle (yerinde burgu) zaten ayni karenin diger yarisina
 geciriyor, ve bir parcanin karsi yarisina basmak bastan beri serbestti - parca yerinde
 kaliyordu, ikiniz tam bir kare oluyordunuz, ama hicbir anlami yoktu. Yeni fizik yok,
 var olan bos duruma anlam verildi.
 
-Istenen cift her zaman o katta GERCEKTEN duran renklerden seciliyor; renklerden biri
-tukenirse cift aninda yenileniyor. Oyuncunun hicbir hamleyle duzeltemeyecegi bir hedef
-ekranda durmamali.
+Gorev her zaman o katta GERCEKTEN duran renklerden kuruluyor ve tamamlanamaz hale
+gelirse (`TaskPossible`) aninda yenileniyor. Oyuncunun hicbir hamleyle duzeltemeyecegi
+bir hedef ekranda durmamali.
 
 **Hamle butcesi kaldirildi.** Iki saat olmaz: baski gorevlerden gelecek. Sureli gorevler
 (mesela "40 saniyede mavi") henuz yok, once birlestirme hissi olculecek.
@@ -65,8 +73,8 @@ sabiti degisince kayitli degerler gecersiz oluyor.
 
 1. Birlestirme hissi telefonda olculecek: kare tamamlandigi an okunuyor mu, tasidigin
    rengi ucgenden anlamak yetiyor mu (ucgen parca rengine boyaniyor - parca saniliyor mu).
-2. Gorev listesi: kat basina birden fazla gorev, farkli tipler. Sadece renk toplama degil,
-   birlestirme de gorev olabilsin. Bazilari sureli ("40 saniyede mavi"), hepsi degil.
+2. Sureli gorevler: bazilari saatli olsun ("40 saniyede mavi"), hepsi degil. Gorev tipleri
+   (tek renk / kare) hazir, geriye sure ve kaybetme kaliyor.
 3. Kaybetme kosulu geri gelecek (sureli gorev kacirilinca). `lost` / `lostText` alanlari
    duruyor ama su an hicbir yerden set edilmiyor.
 4. Masada duran kural adayi: ustunden ayrildigin kare arkanda kapaniyor.

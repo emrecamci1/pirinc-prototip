@@ -6,10 +6,12 @@ using UnityEngine;
 // uzerinde zemine ait olmayan sicak renkli parcalar duruyor. Ucgenle gezip parcanin
 // uzerine devriliyorsun.
 //
-// Hedef: parcanin ustune devrilince onu yok etmiyorsun, RENGINI aliyorsun.
-// Ustte istenen bir KARE duruyor (iki yarim, mesela sari + kirmizi). Elinde
-// sari varken kirmizi parcanin KARSI YARISINA basarsan o karede tam bir
-// sari-kirmizi kare olusur ve istenen tamamlanir.
+// Hedef: ustte bir GOREV duruyor ve iki tipten biri oluyor.
+//   Tek renk: "su renkten 3 tane" - ustune devrildigin her dogru renk sayilir.
+//   Kare:     iki yarim, mesela sari + kirmizi. Elinde sari varken kirmizi
+//             parcanin KARSI YARISINA basarsan orada tam bir kare olusur.
+//
+// Parcanin ustune devrilince onu yok etmiyorsun, RENGINI aliyorsun.
 //
 // Bu yeni bir fizik getirmiyor: yerinde burgu zaten ayni karenin diger
 // yarisina geciriyor ve bir parcanin karsi yarisina basmak baslangictan beri
@@ -91,7 +93,8 @@ public class StackPrototype : MonoBehaviour
 		public int Lay, Cx, Cy, Ori;
 		public int A, B;
 		public bool Dove;
-		public int Carry, WantA, WantB, Pairs, Pair;
+		public int Carry, WantA, WantB, Pair;
+		public int Tasks, Kind, Tone, Need, Got;
 	}
 
 	private Camera cam;
@@ -160,8 +163,12 @@ public class StackPrototype : MonoBehaviour
 	private int shardAt;
 
 	private int steps;
-	private int pairs;
+	private int tasks;
 	private int carry = -1;
+	private int objKind = -1;
+	private int objTone = -1;
+	private int objNeed;
+	private int objGot;
 	private int wantA = -1;
 	private int wantB = -1;
 	private float callSlide = 1f;
@@ -514,8 +521,10 @@ public class StackPrototype : MonoBehaviour
 		}
 
 		steps = 0;
-		pairs = 0;
+		tasks = 0;
 		carry = -1;
+		objKind = -1;
+		objTone = -1;
 		wantA = -1;
 		wantB = -1;
 		solved = false;
@@ -530,7 +539,7 @@ public class StackPrototype : MonoBehaviour
 		focusY = LayerY(0);
 		focusVelY = 0f;
 		TintMe();
-		NextPair();
+		NextTask();
 		UpdateHints();
 	}
 
@@ -890,7 +899,8 @@ public class StackPrototype : MonoBehaviour
 		history.Add(new Move
 		{
 			Lay = myLay, Cx = myCx, Cy = myCy, Ori = myOri, A = takeA, B = takeB, Dove = false,
-			Carry = carry, WantA = wantA, WantB = wantB, Pairs = pairs, Pair = -1
+			Carry = carry, WantA = wantA, WantB = wantB, Pair = -1,
+			Tasks = tasks, Kind = objKind, Tone = objTone, Need = objNeed, Got = objGot
 		});
 
 		Swing(myLay, myCx, myCy, myOri, m, out tumblePivot, out tumbleAxis);
@@ -934,11 +944,22 @@ public class StackPrototype : MonoBehaviour
 		Swallow(takeB);
 		TintMe();
 
+		// Tek renk gorevi: ustune bastigin her dogru renk sayiliyor.
+		if (objKind == 0 && takeA >= 0 && pieces[takeA].Tone == objTone)
+		{
+			objGot++;
+			if (objGot >= objNeed)
+			{
+				tasks++;
+				NextTask();
+			}
+		}
+
 		// Karsi yari ayni karenin diger ucgeni: oraya basmak serbest, parca
 		// yerinde kalir, ikiniz birlikte tam bir kare olursunuz. Istenen cift
 		// tutuyorsa kare orada tamamlaniyor.
 		int mate = occ[myLay, myCx, myCy, myOri ^ 3] - 1;
-		if (mate >= 0 && carry >= 0 && IsWanted(carry, pieces[mate].Tone))
+		if (objKind == 1 && mate >= 0 && carry >= 0 && IsWanted(carry, pieces[mate].Tone))
 		{
 			var done = history[history.Count - 1];
 			done.Pair = mate;
@@ -946,9 +967,9 @@ public class StackPrototype : MonoBehaviour
 
 			Swallow(mate);
 			carry = -1;
-			pairs++;
+			tasks++;
 			TintMe();
-			NextPair();
+			NextTask();
 		}
 
 		// Kat temizlendigi anda zemin altindan cekiliyor. Son parcayi almak hem
@@ -959,11 +980,10 @@ public class StackPrototype : MonoBehaviour
 			return;
 		}
 
-		// Istenen ciftin renklerinden biri katta kalmadiysa gorev artik
-		// tamamlanamaz. Oyuncunun duzeltemeyecegi bir hedefi ekranda tutmak
-		// en kotusu: yeni cift seciliyor.
-		if (wantA >= 0 && !PairPossible())
-			NextPair();
+		// Gorev artik tamamlanamiyorsa yenisi seciliyor. Oyuncunun hicbir
+		// hamleyle duzeltemeyecegi bir hedefi ekranda tutmak en kotusu.
+		if (objKind >= 0 && !TaskPossible())
+			NextTask();
 
 		Finish();
 		UpdateHints();
@@ -992,11 +1012,20 @@ public class StackPrototype : MonoBehaviour
 		return (a == wantA && b == wantB) || (a == wantB && b == wantA);
 	}
 
-	// Kareyi yapmak icin birini alip digerinin yanina basman lazim, yani iki
-	// rengin de hala ortada olmasi gerekiyor. Elindeki renk tahtada kalmamis
-	// olsa bile sayilir.
-	private bool PairPossible()
+	private bool TaskPossible()
 	{
+		if (objKind == 0)
+		{
+			int left = 0;
+			for (int i = 0; i < pieceCount; i++)
+				if (pieces[i].Tone == objTone && pieces[i].Lay == myLay && occ[myLay, pieces[i].Cx, pieces[i].Cy, pieces[i].Ori] == i + 1)
+					left++;
+			return left >= objNeed - objGot;
+		}
+
+		// Kareyi yapmak icin birini alip digerinin yanina basman lazim, yani iki
+		// rengin de hala ortada olmasi gerekiyor. Elindeki renk tahtada kalmamis
+		// olsa bile sayilir.
 		int a = carry == wantA ? 1 : 0;
 		int b = carry == wantB ? 1 : 0;
 		for (int i = 0; i < pieceCount; i++)
@@ -1011,10 +1040,13 @@ public class StackPrototype : MonoBehaviour
 		return a > 0 && b > 0;
 	}
 
-	// Istenen cift, o katta GERCEKTEN duran renklerden seciliyor. Kor rastgele
-	// secimde tahtada karsiligi olmayan bir cift cikar; oyuncu bunu hicbir
-	// hamleyle duzeltemez, tek gercek haksizlik bu olurdu.
-	private void NextPair()
+	// Gorev o katta GERCEKTEN duran renklerden kuruluyor; tahtada karsiligi
+	// olmayan bir hedef oyuncunun duzeltemeyecegi tek haksizlik olurdu.
+	//
+	// Iki tip donusumlu degil, rastgele geliyor: hep kare istenirse oyun tek
+	// gorevli gibi okunuyor, hep tek renk istenirse birlestirme hic
+	// kullanilmiyor.
+	private void NextTask()
 	{
 		int n = 0;
 		for (int t = 0; t < PieceTone.Length; t++)
@@ -1027,21 +1059,33 @@ public class StackPrototype : MonoBehaviour
 				toneCand[n++] = t;
 		}
 
-		if (n < 2)
+		objKind = -1;
+		objTone = -1;
+		objGot = 0;
+		wantA = -1;
+		wantB = -1;
+
+		if (n == 0)
+			return;
+
+		callSlide = 0f;
+
+		if (n >= 2 && Random.value < 0.5f)
 		{
-			wantA = -1;
-			wantB = -1;
+			int ia = Random.Range(0, n);
+			int ib = Random.Range(0, n - 1);
+			if (ib >= ia)
+				ib++;
+
+			objKind = 1;
+			wantA = toneCand[ia];
+			wantB = toneCand[ib];
 			return;
 		}
 
-		int ia = Random.Range(0, n);
-		int ib = Random.Range(0, n - 1);
-		if (ib >= ia)
-			ib++;
-
-		wantA = toneCand[ia];
-		wantB = toneCand[ib];
-		callSlide = 0f;
+		objKind = 0;
+		objTone = toneCand[Random.Range(0, n)];
+		objNeed = Mathf.Min(3, tonePool[objTone]);
 	}
 
 	// Tasidigin renk ucgenin kendi rengi oluyor: elinde ne oldugunu anlamak
@@ -1109,8 +1153,8 @@ public class StackPrototype : MonoBehaviour
 		for (int i = 0; i < MoveCount; i++)
 			hints[i].gameObject.SetActive(false);
 
-		// Yeni katta hangi renkler var belli degil; istenen cift bastan seciliyor.
-		NextPair();
+		// Yeni katta hangi renkler var belli degil; gorev bastan seciliyor.
+		NextTask();
 	}
 
 	// Dusen parca once kendi koordinatina bakiyor: biraktigin yerde seni bekliyor.
@@ -1203,7 +1247,11 @@ public class StackPrototype : MonoBehaviour
 		carry = mv.Carry;
 		wantA = mv.WantA;
 		wantB = mv.WantB;
-		pairs = mv.Pairs;
+		tasks = mv.Tasks;
+		objKind = mv.Kind;
+		objTone = mv.Tone;
+		objNeed = mv.Need;
+		objGot = mv.Got;
 		callSlide = 1f;
 		TintMe();
 
@@ -1372,15 +1420,15 @@ public class StackPrototype : MonoBehaviour
 		for (int l = 0; l < Layers; l++)
 			left += alive[l];
 
-		GUI.Label(new Rect(16f * s, 10f * s, 700f * s, 32f * s), "Kare: " + pairs + "     Hamle: " + steps, big);
+		GUI.Label(new Rect(16f * s, 10f * s, 700f * s, 32f * s), "Gorev: " + tasks + "     Hamle: " + steps, big);
 		GUI.Label(new Rect(16f * s, 40f * s, 700f * s, 32f * s),
 			"Kat " + (myLay + 1) + " / " + Layers + "     Bu katta: " + alive[myLay] + "     Kalan: " + left, big);
 		if (myLay < Layers - 1)
 			GUI.Label(new Rect(16f * s, 70f * s, 700f * s, 32f * s), "Bu kati temizleyince zemin cekiliyor, asagi iniyorsun.", big);
 
-		// Istenen kare yandan kayarak giriyor: degistigi an goz sayiya degil
-		// harekete takiliyor.
-		if (wantA >= 0 && !solved && !lost)
+		// Gorev yandan kayarak giriyor: degistigi an goz sayiya degil harekete
+		// takiliyor. Tek renk gorevi tek ucgen, kare gorevi iki yarim.
+		if (objKind >= 0 && !solved && !lost)
 		{
 			float q = 68f * s;
 			float e = 1f - (1f - callSlide) * (1f - callSlide);
@@ -1389,19 +1437,28 @@ public class StackPrototype : MonoBehaviour
 			var r = new Rect(bx, by, q, q);
 
 			var oc = GUI.color;
-			GUI.color = PieceTone[wantA];
-			GUI.DrawTexture(r, halfTex);
-			GUI.color = PieceTone[wantB];
-			GUIUtility.RotateAroundPivot(180f, r.center);
-			GUI.DrawTexture(r, halfTex);
-			GUI.matrix = Matrix4x4.identity;
+			if (objKind == 1)
+			{
+				GUI.color = PieceTone[wantA];
+				GUI.DrawTexture(r, halfTex);
+				GUI.color = PieceTone[wantB];
+				GUIUtility.RotateAroundPivot(180f, r.center);
+				GUI.DrawTexture(r, halfTex);
+				GUI.matrix = Matrix4x4.identity;
+			}
+			else
+			{
+				GUI.color = PieceTone[objTone];
+				GUI.DrawTexture(r, halfTex);
+			}
 			GUI.color = oc;
 
-			GUI.Label(new Rect(bx + q + 10f * s, by + 20f * s, 320f * s, 40f * s), "bu kareyi yap", big);
+			GUI.Label(new Rect(bx + q + 10f * s, by + 20f * s, 320f * s, 40f * s),
+				objKind == 1 ? "kareyi yap" : objGot + " / " + objNeed, big);
 		}
 
 		if (solved)
-			GUI.Label(new Rect(0f, Screen.height * 0.4f, Screen.width, 60f * s), "TEMIZ  -  " + pairs + " kare  /  " + steps + " hamle", huge);
+			GUI.Label(new Rect(0f, Screen.height * 0.4f, Screen.width, 60f * s), "TEMIZ  -  " + tasks + " gorev  /  " + steps + " hamle", huge);
 		else if (lost)
 			GUI.Label(new Rect(0f, Screen.height * 0.4f, Screen.width, 60f * s), lostText + "  -  R ile bastan", huge);
 
@@ -1482,7 +1539,7 @@ public class StackPrototype : MonoBehaviour
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Parcaya basinca rengini alirsin");
 		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Karsi yariya basinca kare tamamlanir");
+		GUI.Label(new Rect(x, y, w, 24f * s), "Kare gorevinde karsi yariya bas");
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Z: geri al (kat icinde)");
 
