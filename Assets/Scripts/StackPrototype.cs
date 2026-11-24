@@ -217,6 +217,7 @@ public class StackPrototype : MonoBehaviour
 	private bool tapped;
 	private bool showPanel;
 	private Vector2 panelScroll;
+	private float panelContent;
 	private float panelLeft;
 	private int seed = 1;
 
@@ -1678,6 +1679,11 @@ public class StackPrototype : MonoBehaviour
 		GUI.skin.toggle.fontSize = body;
 		GUI.skin.box.fontSize = body;
 
+		// Kaydirma cubugu parmakla tutulacak kadar genis olmali: IMGUI kaydirma
+		// alani dokunusla SURUKLENMIYOR, tek tutamak ince cubugun kendisi.
+		GUI.skin.verticalScrollbar.fixedWidth = 30f * s;
+		GUI.skin.verticalScrollbarThumb.fixedWidth = 30f * s;
+
 		var big = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(21f * s) };
 		var huge = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(38f * s), alignment = TextAnchor.MiddleCenter };
 
@@ -1748,12 +1754,50 @@ public class StackPrototype : MonoBehaviour
 		panelScroll = GUI.BeginScrollView(
 			new Rect(panelLeft + 8f * s, 58f * s, pw - 16f * s, Screen.height - 82f * s),
 			panelScroll,
-			// Yazi buyuyunce icerik de uzadi; kisa kalirsa alttaki dugmeler kesiliyor.
-			new Rect(0f, 0f, pw - 44f * s, 1400f * s));
+			// Icerik yuksekligi sabit degil, gecen karede nereye kadar uzadiysa o:
+			// sabit sayi tutmadiginda alttaki dugmelere hic ulasilamiyordu.
+			new Rect(0f, 0f, pw - 44f * s, Mathf.Max(panelContent, 1f)));
 
 		float x = 0f;
 		float y = 0f;
 		float w = pw - 48f * s;
+
+		// Dugmeler en ustte: en cok kullanilanlar icin paneli dibe kadar
+		// kaydirmak gerekmemeli.
+		if (GUI.Button(new Rect(x, y, w, 34f * s), "Bastan (R)"))
+			Build();
+		y += 40f * s;
+		if (GUI.Button(new Rect(x, y, w, 34f * s), "Yeni tahta (N)"))
+		{
+			seed++;
+			SavePrefs();
+			Build();
+		}
+		y += 40f * s;
+		if (GUI.Button(new Rect(x, y, w, 34f * s), "Varsayilana don"))
+		{
+			PlayerPrefs.DeleteKey("stk_ver");
+			PlayerPrefs.Save();
+			Layers = 3;
+			TopRadius = 2;
+			RadiusStep = 1;
+			LayerGap = 0.82f;
+			SlabRatio = 1.15f;
+			FogAmount = 0.8f;
+			HintSize = 0.42f;
+			PieceRatio = 0.26f;
+			Build();
+		}
+		y += 44f * s;
+
+		bool nh = GUI.Toggle(new Rect(x, y, w, 26f * s), Hints, " Yonerge ucgenleri");
+		if (nh != Hints)
+		{
+			Hints = nh;
+			SavePrefs();
+			UpdateHints();
+		}
+		y += 40f * s;
 
 		SliderInt(ref Layers, 2, FloorTone.Length, "Kat sayisi", x, ref y, w, s, true);
 		SliderInt(ref TopRadius, 1, 5, "Ust kat yaricapi", x, ref y, w, s, true);
@@ -1772,52 +1816,20 @@ public class StackPrototype : MonoBehaviour
 		Slider(ref CamPitch, 20f, 85f, "Kamera egimi", x, ref y, w, s, false);
 		Slider(ref CamZoom, 0.6f, 2f, "Kamera uzakligi", x, ref y, w, s, false);
 
-		bool nh = GUI.Toggle(new Rect(x, y, w, 24f * s), Hints, " Yonerge ucgenleri");
-		if (nh != Hints)
-		{
-			Hints = nh;
-			SavePrefs();
-			UpdateHints();
-		}
-		y += 34f * s;
+		GUI.Label(new Rect(x, y, w, 26f * s), "Tohum: " + seed);
+		y += 32f * s;
+		GUI.Label(new Rect(x, y, w, 26f * s), "Gitmek istedigin yere dokun");
+		y += 26f * s;
+		GUI.Label(new Rect(x, y, w, 26f * s), "Parcaya basinca rengini alirsin");
+		y += 26f * s;
+		GUI.Label(new Rect(x, y, w, 26f * s), "Gerekmeyenin ustunden gecersin");
+		y += 26f * s;
+		GUI.Label(new Rect(x, y, w, 26f * s), "Karede ici bos yarim senin rengin");
+		y += 26f * s;
+		GUI.Label(new Rect(x, y, w, 26f * s), "Z: geri al (kat icinde)");
+		y += 26f * s;
 
-		GUI.Label(new Rect(x, y, w, 24f * s), "Tohum: " + seed);
-		y += 28f * s;
-		if (GUI.Button(new Rect(x, y, w, 30f * s), "Yeni tahta (N)"))
-		{
-			seed++;
-			SavePrefs();
-			Build();
-		}
-		y += 36f * s;
-		if (GUI.Button(new Rect(x, y, w, 30f * s), "Bastan (R)"))
-			Build();
-		y += 36f * s;
-		if (GUI.Button(new Rect(x, y, w, 30f * s), "Varsayilana don"))
-		{
-			PlayerPrefs.DeleteKey("stk_ver");
-			PlayerPrefs.Save();
-			Layers = 3;
-			TopRadius = 2;
-			RadiusStep = 1;
-			LayerGap = 0.82f;
-			SlabRatio = 1.15f;
-			FogAmount = 0.8f;
-			HintSize = 0.42f;
-			PieceRatio = 0.26f;
-			Build();
-		}
-		y += 42f * s;
-
-		GUI.Label(new Rect(x, y, w, 24f * s), "Gitmek istedigin yere dokun");
-		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Parcaya basinca rengini alirsin");
-		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Gerekmeyen parcanin ustunden gecersin");
-		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Karede ici bos yarim senin rengin");
-		y += 24f * s;
-		GUI.Label(new Rect(x, y, w, 24f * s), "Z: geri al (kat icinde)");
+		panelContent = y + 16f * s;
 
 		GUI.EndScrollView();
 	}

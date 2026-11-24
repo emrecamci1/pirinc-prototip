@@ -115,7 +115,13 @@ daha once kaldirildi.
 **Ayarlar:** oyun icinde IMGUI slider paneli. Yazi boyutunu OnGUI basinda
 `GUI.skin.label/button/toggle/box.fontSize` olarak veriyoruz: IMGUI varsayilan yazisi
 ekran olceginden etkilenmiyor, kutular `s` ile buyurken yazi 12 pikselde kaliyor ve
-telefonda panel okunmuyordu. PlayerPrefs'e yaziyor, `DefaultsVersion`
+telefonda panel okunmuyordu.
+
+Panelde dikkat edilecek uc sey: kaydirma alani dokunusla SURUKLENMIYOR (IMGUI boyle),
+bu yuzden kaydirma cubugu `30 * s` genisliginde - parmakla tutulabilsin diye. Icerik
+yuksekligi sabit sayi degil, gecen karede `y` nereye kadar uzadiysa o (`panelContent`);
+sabit sayi tutmadiginda alttaki dugmelere hic ulasilamiyordu. Dugmeler de en uste
+alindi, en cok kullanilanlar icin dibe kadar kaydirmak gerekmesin. PlayerPrefs'e yaziyor, `DefaultsVersion`
 sabiti degisince kayitli degerler gecersiz oluyor.
 
 ## Siradaki
