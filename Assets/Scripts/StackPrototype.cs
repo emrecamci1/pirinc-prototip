@@ -43,6 +43,12 @@ public class StackPrototype : MonoBehaviour
 {
 	private const int DefaultsVersion = 10;
 
+	// Ekranin sag ustunde yazar: telefonda hangi surumu oynadigin belli olsun diye.
+	// Her itilen degisiklikte bir artar ve ayni numara git etiketi olarak atilir,
+	// yani "v6 daha iyiydi" demek o surume birebir donmeye yetiyor. SURUMLER.md
+	// hangi numarada ne degistigini tutuyor.
+	private const string Version = "v1";
+
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
 	private static readonly int[] DirX = { 1, -1, 0, 0 };
@@ -1823,6 +1829,14 @@ public class StackPrototype : MonoBehaviour
 		panelLeft = Screen.width - pw - 10f * s;
 		if (GUI.Button(new Rect(Screen.width - 110f * s, 10f * s, 100f * s, 32f * s), showPanel ? "Kapat" : "Ayar"))
 			showPanel = !showPanel;
+
+		var vs = new GUIStyle(GUI.skin.label)
+		{
+			fontSize = Mathf.RoundToInt(15f * s),
+			alignment = TextAnchor.MiddleRight
+		};
+		vs.normal.textColor = new Color(0.35f, 0.34f, 0.32f);
+		GUI.Label(new Rect(Screen.width - 110f * s, 44f * s, 100f * s, 22f * s), Version, vs);
 
 		if (!showPanel)
 			return;

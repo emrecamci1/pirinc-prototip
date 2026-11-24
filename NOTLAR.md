@@ -8,6 +8,8 @@ Emre sanat ve Play Mode testini yapiyor; kodu Claude yaziyor.
 - Calisma dizini is bilgisayarinda `spooky-match` olabilir. **Bu projenin kodu oraya ASLA yazilmaz.**
 - Kaynak kodda Turkce karakter yok (ASCII). Tek istisna: editor `[MenuItem("Pirinç/...")]` yollari.
 - Sahneler calisma aninda kuruluyor: sahnede sadece kamera + script tasiyici var, geri kalani `Awake()` icinde.
+- Her itilen degisiklik bir surum numarasi alir (`StackPrototype.Version`, ekranin sag ustunde yazar),
+  ayni numara git etiketi olarak atilir ve `SURUMLER.md` icine yazilir. Geri donus bu numaradan yapilir.
 
 ## Sahneler
 
