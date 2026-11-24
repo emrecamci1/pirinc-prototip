@@ -201,14 +201,14 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
    (7168a27 revert). Yani rozetle tahtanin tam ayni renk olmamasi bilinen ve kabul
    edilmis bir sonuc; tekrar duzeltmeye kalkisma.
 
+   **Isiga/contrast'a artik dokunma.** Iki ayri deneme de GERI ALINDI: once carpani 1.0a
+   ceken kalibrasyon (7168a27), sonra "her sey sisli" sikayetinden sonra yapilan contrast
+   duzeltmesi (bbe0e90: golge tam siddet, dolgu 0.20, kenar isigi 0, ek Parlaklik/Kenar
+   isigi ayarlari). Ikincisi de begenilmedi ve ayni gun revert edildi - yani mevcut
+   degerler (golge 0.62, dolgu 0.38, kenar isigi 0.30, spekular 0.22) ISTENEN hal.
+   Yeniden bir netlik sikayeti gelirse once NEYIN okunmadigini sor (rozet mi, parca
+   kenari mi, hangi kat) ve o tek seyi duzelt; sahne isigini topluca degistirme.
+
 Blender hala masada ama parca KAYNAGI olarak degil: ucgen `Inset` / `TriThick` / `Bevel`
 ayarlarina bagli uretildigi icin FBX getirmek o bagi koparir (pivot dik aci yerelde (0,0),
 bacaklar +X ve +Z). Blender'i hedef belirlemek icin kullanmak mantikli, uretim icin degil.
-
-**"Her sey sisli" tuzagi.** Gorsel turunde eklenen uc sey birden contrast yiyordu:
-golge siddeti 0.62'ye dusurulmustu (temas golgesi yoksa parca zemine oturmuyor),
-dolgu isigi 0.38 idi (dolgu dogrudan golgedeki yuzleri kaldiriyor, yani fazlasi
-perde demek), ve shaderin kenar isigi 0.30 idi - emission olarak bindigi ve golgeyi
-tanimadigi icin yuzlerce kucuk parcada ortak bir parlama yapiyordu. Golge tam siddete
-dondu, dolgu 0.20, kenar isigi varsayilan 0. Parlaklik ve kenar isigi artik ayardan
-(`Spec` / `Rim`) degistirilebiliyor.

@@ -11,8 +11,8 @@ Shader "Pirinc/TriLit"
 	{
 		_Color ("Renk", Color) = (1,1,1,1)
 		_SpecPower ("Parlaklik keskinligi", Range(0.03, 1)) = 0.30
-		_SpecAmount ("Parlaklik siddeti", Range(0, 1)) = 0.14
-		_RimAmount ("Kenar isigi", Range(0, 1)) = 0.0
+		_SpecAmount ("Parlaklik siddeti", Range(0, 1)) = 0.22
+		_RimAmount ("Kenar isigi", Range(0, 1)) = 0.30
 		_RimPower ("Kenar isigi keskinligi", Range(1, 8)) = 3.5
 	}
 
