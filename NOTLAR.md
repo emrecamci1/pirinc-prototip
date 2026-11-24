@@ -220,7 +220,8 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
 Referans modeli: `Documents/Blender/Eskiz/blender_ucgen_oyun.py` tek ucgeni oyunun
 birebir olculerinde kuruyor (bacak 0.93, kalinlik 0.11, pah 0.013, pah sadece cevre
 kenarlarinda, dikey koseler keskin). Olcu degisirse script parametre aliyor.
-4. **Cam parcalar (v2).** Parcalar artik yari saydam: `Assets/Resources/TriGlass.shader`.
+4. **Cam parcalar - GERI ALINDI (v2, v3 ile kaldirildi).** Asagisi neden calistigini
+   anlatiyor, tekrar denenecek olursa diye duruyor; su an kodda YOK. Parcalar artik yari saydam: `Assets/Resources/TriGlass.shader`.
    Govde `Cam` ayarina gore saydam (0 = eski opak hal, 1 = alfa 0.40), kenarlar
    fresnel ile hem opaklasiyor hem parliyor - cama kenarindan bakinca kat edilen
    kalinlik artiyor, kenarin parlak gorunmesi bundan. Blender referansindaki
