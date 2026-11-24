@@ -15,6 +15,7 @@ numaradir. Boylece hicbir ara hal kaybolmaz.
 
 | Surum | Commit | Ne degisti | Karar |
 |-------|--------|------------|-------|
+| v2 | (bu commit) | Parcalar cam oldu: TriGlass shader (yari saydam govde, fresnel kenar), ust yuz parlamasi icin ucuncu isik, panelde `Cam` ayari. Zemin ve tahta aynen duruyor. | Telefonda bakilacak |
 | v1 | d802569 | Gorsel olarak onaylanan hal: pahli kenar, spekular shader, iki isik + degrade ortam isigi. Rozetler ham renkle ciziliyor. Surum etiketi eklendi. | Onayli |
 
 ## v1 oncesi (numarasiz)

@@ -41,13 +41,13 @@ using UnityEngine;
 // parcalar seninle beraber dusuyor.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 10;
+	private const int DefaultsVersion = 12;
 
 	// Ekranin sag ustunde yazar: telefonda hangi surumu oynadigin belli olsun diye.
 	// Her itilen degisiklikte bir artar ve ayni numara git etiketi olarak atilir,
 	// yani "v6 daha iyiydi" demek o surume birebir donmeye yetiyor. SURUMLER.md
 	// hangi numarada ne degistigini tutuyor.
-	private const string Version = "v1";
+	private const string Version = "v2";
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -97,6 +97,7 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float TriThick = 0.11f;
 	[System.NonSerialized] public float Bevel = 0.013f;
 	[System.NonSerialized] public bool Shiny = true;
+	[System.NonSerialized] public float Glass = 0.7f;
 	private float FloorThick;
 	[System.NonSerialized] public float Inset = 0.07f;
 	[System.NonSerialized] public float FloorInset = 0.11f;
@@ -311,6 +312,17 @@ public class StackPrototype : MonoBehaviour
 			fill.color = new Color(0.70f, 0.79f, 1f);
 			fill.transform.rotation = Quaternion.Euler(26f, -142f, 0f);
 			fill.shadows = LightShadows.None;
+
+			// Ust yuzdeki cam parlamasi. Yeri rastgele degil: kameranin ust
+			// yuzden yansiyan bakisi tam buraya gidiyor, yani yari vektor
+			// yukari bakiyor. Kamera egimi 52 oldugu icin bu isik da 52,
+			// ama tahtanin arkasindan. Siddet dusuk cunku isi aydinlatmak
+			// degil parlatmak.
+			var glint = new GameObject("Glint").AddComponent<Light>();
+			glint.type = LightType.Directional;
+			glint.intensity = 0.3f;
+			glint.transform.rotation = Quaternion.Euler(52f, 180f, 0f);
+			glint.shadows = LightShadows.None;
 		}
 
 		// Tek renk ortam isigi her yuzu esit aydinlatip hacmi siliyordu. Ustten
@@ -324,11 +336,15 @@ public class StackPrototype : MonoBehaviour
 		SetupCamera();
 	}
 
-	private Material MakeMat(Color c)
+	private Material MakeMat(Color c, bool glass = false)
 	{
 		// TriLit Resources altinda: sahne calisma aninda kuruldugu icin hicbir
 		// materyal onu referans etmiyor ve normalde derlemede silinirdi.
-		Shader sh = Shiny ? Resources.Load<Shader>("TriLit") : null;
+		Shader sh = null;
+		if (glass && Glass > 0f)
+			sh = Resources.Load<Shader>("TriGlass");
+		if (sh == null && Shiny)
+			sh = Resources.Load<Shader>("TriLit");
 		if (sh == null)
 			sh = Shader.Find("Legacy Shaders/Diffuse");
 		if (sh == null)
@@ -337,6 +353,10 @@ public class StackPrototype : MonoBehaviour
 			sh = Shader.Find("Unlit/Color");
 
 		var m = new Material(sh);
+		// Tam saydam parca rengini kaybediyor, tam opak cam olmuyor: 0.40 alt
+		// sinir ikisinin arasi. Kenarlar shader tarafinda zaten opaklasiyor.
+		if (glass && Glass > 0f)
+			c.a = Mathf.Lerp(1f, 0.4f, Glass);
 		m.color = c;
 		return m;
 	}
@@ -637,7 +657,7 @@ public class StackPrototype : MonoBehaviour
 
 		matPiece = new Material[PieceTone.Length];
 		for (int i = 0; i < PieceTone.Length; i++)
-			matPiece[i] = MakeMat(PieceTone[i]);
+			matPiece[i] = MakeMat(PieceTone[i], true);
 
 		onShape = new bool[Layers, gridN, gridN];
 		reach = new bool[Layers, gridN, gridN, 4];
@@ -1879,6 +1899,7 @@ public class StackPrototype : MonoBehaviour
 			PieceRatio = 0.26f;
 			Bevel = 0.013f;
 			Shiny = true;
+			Glass = 0.7f;
 			Build();
 		}
 		y += 44f * s;
@@ -1914,6 +1935,7 @@ public class StackPrototype : MonoBehaviour
 		Slider(ref HopHeight, 0f, 0.3f, "Takla yayi", x, ref y, w, s, false);
 		Slider(ref TriThick, 0.04f, 0.3f, "Ucgen kalinlik", x, ref y, w, s, true);
 		Slider(ref Bevel, 0f, 0.05f, "Pah genisligi", x, ref y, w, s, true);
+		Slider(ref Glass, 0f, 1f, "Cam", x, ref y, w, s, true);
 		Slider(ref Inset, 0f, 0.25f, "Ucgen bosluk", x, ref y, w, s, true);
 		Slider(ref FloorInset, 0f, 0.25f, "Zemin bosluk", x, ref y, w, s, true);
 		Slider(ref CamPitch, 20f, 85f, "Kamera egimi", x, ref y, w, s, false);
@@ -1986,6 +2008,7 @@ public class StackPrototype : MonoBehaviour
 		TriThick = PlayerPrefs.GetFloat("stk_th", TriThick);
 		Bevel = PlayerPrefs.GetFloat("stk_bev", Bevel);
 		Shiny = PlayerPrefs.GetInt("stk_shiny", Shiny ? 1 : 0) == 1;
+		Glass = PlayerPrefs.GetFloat("stk_glass", Glass);
 		Inset = PlayerPrefs.GetFloat("stk_in", Inset);
 		FloorInset = PlayerPrefs.GetFloat("stk_fin", FloorInset);
 		CamPitch = PlayerPrefs.GetFloat("stk_cp", CamPitch);
@@ -2011,6 +2034,7 @@ public class StackPrototype : MonoBehaviour
 		PlayerPrefs.SetFloat("stk_th", TriThick);
 		PlayerPrefs.SetFloat("stk_bev", Bevel);
 		PlayerPrefs.SetInt("stk_shiny", Shiny ? 1 : 0);
+		PlayerPrefs.SetFloat("stk_glass", Glass);
 		PlayerPrefs.SetFloat("stk_in", Inset);
 		PlayerPrefs.SetFloat("stk_fin", FloorInset);
 		PlayerPrefs.SetFloat("stk_cp", CamPitch);

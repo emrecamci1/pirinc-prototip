@@ -220,6 +220,31 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
 Referans modeli: `Documents/Blender/Eskiz/blender_ucgen_oyun.py` tek ucgeni oyunun
 birebir olculerinde kuruyor (bacak 0.93, kalinlik 0.11, pah 0.013, pah sadece cevre
 kenarlarinda, dikey koseler keskin). Olcu degisirse script parametre aliyor.
+4. **Cam parcalar (v2).** Parcalar artik yari saydam: `Assets/Resources/TriGlass.shader`.
+   Govde `Cam` ayarina gore saydam (0 = eski opak hal, 1 = alfa 0.40), kenarlar
+   fresnel ile hem opaklasiyor hem parliyor - cama kenarindan bakinca kat edilen
+   kalinlik artiyor, kenarin parlak gorunmesi bundan. Blender referansindaki
+   (`ucgen_oyun.blend`) buzlu cam bakisi buraya tasindi.
+
+   Iki tuzak, ikisi de sisle ilgili:
+   - **Siralama**: sis tabakalari Sprites/Default ile 3000'de. Parca da 3000'de
+     olsaydi mesafeye gore bazi parcalar sisten SONRA cizilir, bazilari once -
+     alt katin sisi ust kattaki parcalarin uzerine binerdi. Shader bu yuzden
+     `Transparent-100` (2900).
+   - **ZWrite On**: kapali bir parcanin gorunen yuzleri (arka yuzler elendigi
+     icin) hic ust uste binmiyor, yani saydamin alisildik siralama sorunu yok.
+     Kapatsaydik sis tabakalari derinlik testine takilmaz, parcalarin onune
+     gecerdi. Yani ZWrite On sadece bir optimizasyon degil, sisin calismasinin
+     sarti.
+
+   Ust yuzdeki parlama icin ucuncu bir yonlu isik var ("Glint", 0.30, Euler
+   52/180). Yeri rastgele degil: kamera egimi de 52, yani kameranin ust yuzden
+   yansiyan bakisi tam oraya gidiyor ve yari vektor yukari bakiyor. Tahtanin
+   ONUNDEN gelen bir isik ust yuzu aydinlatir ama parlatmaz.
+
+   Renk tasiyan oyuncu da `matPiece[carry]` kullandigi icin camlasiyor. Tahtada
+   oyuncuyu kaybetmek sorun olursa oyuncuya ayri bir opak malzeme seti gerekir.
+
 
 Blender hala masada ama parca KAYNAGI olarak degil: ucgen `Inset` / `TriThick` / `Bevel`
 ayarlarina bagli uretildigi icin FBX getirmek o bagi koparir (pivot dik aci yerelde (0,0),
