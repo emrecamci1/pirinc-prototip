@@ -209,6 +209,12 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
    Yeniden bir netlik sikayeti gelirse once NEYIN okunmadigini sor (rozet mi, parca
    kenari mi, hangi kat) ve o tek seyi duzelt; sahne isigini topluca degistirme.
 
+   Rozet rengine isik carpanini uygulayan `Swatch()` de GERI ALINDI: carpan kanallari
+   1'de kirptigi icin rozetler solgunlasiyordu (sari neredeyse beyaz). Rozet ham
+   `PieceTone` ile ciziliyor - yani tahtadan daha doygun, kasitli. Gorsel olarak
+   onaylanan hal e5757d1 commit'idir; bir sey bozuldu sanirsan once ona bak.
+
+
 Blender hala masada ama parca KAYNAGI olarak degil: ucgen `Inset` / `TriThick` / `Bevel`
 ayarlarina bagli uretildigi icin FBX getirmek o bagi koparir (pivot dik aci yerelde (0,0),
 bacaklar +X ve +Z). Blender'i hedef belirlemek icin kullanmak mantikli, uretim icin degil.
