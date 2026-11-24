@@ -3,6 +3,36 @@
 Kisisel yan proje. Unity 2022.3.57f1, built-in render pipeline, dikey (portrait) mobil hedef.
 Emre sanat ve Play Mode testini yapiyor; kodu Claude yaziyor.
 
+## DURAKLATILDI - 24 Kasim 2026
+
+Emre oyunu dusunmek icin duraklatti. Kod tarafinda yarim is YOK: calisma agaci
+temiz, her sey `origin/main` uzerinde, en son surum `v5` (commit a5d5e26).
+Geri donus: `git checkout v5` (ya da v1..v4). Devam edilecekse once bu bolum.
+
+**Bes surumde ogrenilenler - asil birikim bunlar, kod degil:**
+
+| Ne denendi | Hukum |
+|---|---|
+| Gorsel: pahli kenar, spekular shader, iki isik + degrade ortam | **Onayli** (v1). Buna dokunma. |
+| Isik kalibrasyonu, contrast duzeltmesi | Iki kez denendi, iki kez elendi (v1 oncesi). Tekrar deneme. |
+| Cam / yari saydam parcalar | Elendi (v2 -> v3). |
+| Rozet renginin tahtadaki renkle esitlenmesi | v4'te yapildi, ayrica hukum verilmedi. |
+| **Kenardan takla atarak ilerleme** | **Elendi** (v4'e kadarki butun surumler). "Zevkli akiskan hissettirmedi." |
+| **Parmakla surulen surekli hareket** | **Elendi** (v5). "Yok olmadi yine." |
+
+Yani iki ayri lokomosyon fikri de dustu. Problem muhtemelen hareketin
+CINSI degil: oyuncunun hareket ederken verdigi bir karar olmamasi. Her iki
+surumde de yurumek, renk toplamakla araya giren bir mesafeydi; hangi yoldan
+gidildiginin bir bedeli ya da getirisi yoktu.
+
+**Cevaplanmamis asil soru - Emre'nin kendi sozuyle "amaci olmadi":**
+renk toplayip kare kurmak gercekten bir hedef mi, yoksa hareketin bahanesi mi?
+Hareket uzerinde ucuncu bir deneme yapmadan once bu cevaplanmali; aksi halde
+dorduncu bir lokomosyon da ayni sekilde duser.
+
+Masada duran, henuz denenmemis tek kural adayi: ustunden ayrildigin kare
+arkanda kapaniyor (yani yol secmenin bir bedeli oluyor).
+
 ## Kurallar
 
 - Calisma dizini is bilgisayarinda `spooky-match` olabilir. **Bu projenin kodu oraya ASLA yazilmaz.**
@@ -22,8 +52,9 @@ Sahne yoksa veya bozuksa menuden tekrar kur; `Assets/Editor/SetupStackScene.cs` 
 
 ## YIGIN (aktif prototip)
 
-Kat kat duran bir board. Ucgenle kenar uzerinden takla atarak geziyoruz. Kat tamamen
-BOSALINCA asagiki kata iniyoruz: her kata konan her renk kullanilacak.
+Kat kat duran bir board. Ucgenle gezip renk topluyoruz (v5'ten beri parmakla
+surulerek, ondan once kenardan takla atarak - ikisi de begenilmedi, yukariya bak).
+Kat tamamen BOSALINCA asagiki kata iniyoruz: her kata konan her renk kullanilacak.
 
 **Hedef (2026-11-23):** parcanin ustune devrilince onu yok etmiyorsun, RENGINI
 aliyorsun - ucgen o renge donuyor. Tek renk tasiniyor, yenisini almak eskisini siler.
