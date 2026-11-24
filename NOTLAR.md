@@ -112,7 +112,10 @@ inince ve geri alinca yol temizleniyor (`ClearPath`).
 Masaustunde kaydirma (swipe) hala tek hamle surmek icin duruyor. Harfler ve klavye
 daha once kaldirildi.
 
-**Ayarlar:** oyun icinde IMGUI slider paneli. PlayerPrefs'e yaziyor, `DefaultsVersion`
+**Ayarlar:** oyun icinde IMGUI slider paneli. Yazi boyutunu OnGUI basinda
+`GUI.skin.label/button/toggle/box.fontSize` olarak veriyoruz: IMGUI varsayilan yazisi
+ekran olceginden etkilenmiyor, kutular `s` ile buyurken yazi 12 pikselde kaliyor ve
+telefonda panel okunmuyordu. PlayerPrefs'e yaziyor, `DefaultsVersion`
 sabiti degisince kayitli degerler gecersiz oluyor.
 
 ## Siradaki

@@ -1670,6 +1670,14 @@ public class StackPrototype : MonoBehaviour
 	private void OnGUI()
 	{
 		float s = Mathf.Max(Screen.width, Screen.height) / 900f;
+		// IMGUI varsayilan yazisi ekran olceginden etkilenmiyor: kutular s ile
+		// buyuyor ama yazi 12 pikselde kaliyor, telefonda ayar paneli okunmuyordu.
+		int body = Mathf.RoundToInt(18f * s);
+		GUI.skin.label.fontSize = body;
+		GUI.skin.button.fontSize = body;
+		GUI.skin.toggle.fontSize = body;
+		GUI.skin.box.fontSize = body;
+
 		var big = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(21f * s) };
 		var huge = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(38f * s), alignment = TextAnchor.MiddleCenter };
 
@@ -1740,7 +1748,8 @@ public class StackPrototype : MonoBehaviour
 		panelScroll = GUI.BeginScrollView(
 			new Rect(panelLeft + 8f * s, 58f * s, pw - 16f * s, Screen.height - 82f * s),
 			panelScroll,
-			new Rect(0f, 0f, pw - 44f * s, 1120f * s));
+			// Yazi buyuyunce icerik de uzadi; kisa kalirsa alttaki dugmeler kesiliyor.
+			new Rect(0f, 0f, pw - 44f * s, 1400f * s));
 
 		float x = 0f;
 		float y = 0f;
