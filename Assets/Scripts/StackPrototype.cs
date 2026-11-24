@@ -69,6 +69,18 @@ public class StackPrototype : MonoBehaviour
 
 	private static readonly Color BackColor = new Color(0.80f, 0.79f, 0.75f);
 
+	// Parca tahtada isik altinda duruyor, rozet ise duz bir damga. Ham albedo
+	// cizmek rozeti tahtadakinden farkli gosteriyordu ve hangi rozetin hangi
+	// parca oldugu anlasilmiyordu.
+	//
+	// Ust yuze dusen toplam carpan, kanal basina:
+	//   gunes   1.05 * sin(52) = 0.827          (beyaz)
+	//   dolgu   0.38 * sin(26) = 0.167          x (0.70, 0.79, 1.00)
+	//   gok ortami                              = (0.64, 0.68, 0.76)
+	// Renk uzayi Gamma oldugu icin carpan dogrudan sRGB degeri uzerinde isliyor.
+	// ISIK DEGERLERI DEGISIRSE BURASI DA DEGISMELI.
+	private static readonly Color LitMul = new Color(1.584f, 1.639f, 1.754f);
+
 	private static readonly Color[] PieceTone =
 	{
 		new Color(0.92f, 0.41f, 0.34f),
@@ -282,25 +294,26 @@ public class StackPrototype : MonoBehaviour
 		// ne katlarin yuksekligi ne de ucgenlerin kalinligi okunuyor.
 		if (FindObjectOfType<Light>() == null)
 		{
+			// Siddetler bilerek yuksek: ust yuze dusen toplam carpan ~1.6, yani
+			// parca tahtada kendi renginden parlak goruluyor ve doygun renkler
+			// beyaza dogru kayiyor. Bu bir kez 1.0a kalibre edildi (o zaman tahta
+			// rengi gorev rozetiyle birebir esitleniyor) ama parlak hali daha iyi
+			// bulundu ve geri alindi. Rozetle tahtanin tam ayni renk olmamasi
+			// kabul edilmis bir sonuc, duzeltilecek bir hata degil.
 			var lg = new GameObject("Sun").AddComponent<Light>();
 			lg.type = LightType.Directional;
-			// Siddetler keyfi degil, KALIBRE: ust yuze dusen toplam carpan
-			// (gunes * sin52 + dolgu * sin26 + gok ortami) 1.0 civarinda tutuluyor.
-			// Boylece parca tahtada kendi rengiyle goruluyor ve ustteki gorev
-			// rozetiyle ayni okunuyor. Onceki degerlerde carpan 1.6 idi: doygun
-			// kirmizi beyaza kirpiliyor, rozetle tahta birbirini tutmuyordu.
-			lg.intensity = 0.62f;
+			lg.intensity = 1.05f;
 			lg.transform.rotation = Quaternion.Euler(52f, 36f, 0f);
 			// Golge olmadan ust kat alt katin uzerine oturmuyor, havada duruyor.
 			lg.shadows = LightShadows.Soft;
-			lg.shadowStrength = 0.55f;
+			lg.shadowStrength = 0.62f;
 
 			// Karsi yondan soguk bir dolgu. Tek isikta golgede kalan yuzler
 			// tamamen duzlesiyor ve parcanin yan yuzu govdesinden ayirt
 			// edilemiyor; hacim esas iki isigin farkindan okunuyor.
 			var fill = new GameObject("Fill").AddComponent<Light>();
 			fill.type = LightType.Directional;
-			fill.intensity = 0.24f;
+			fill.intensity = 0.38f;
 			fill.color = new Color(0.70f, 0.79f, 1f);
 			fill.transform.rotation = Quaternion.Euler(26f, -142f, 0f);
 			fill.shadows = LightShadows.None;
@@ -309,9 +322,9 @@ public class StackPrototype : MonoBehaviour
 		// Tek renk ortam isigi her yuzu esit aydinlatip hacmi siliyordu. Ustten
 		// acik, altta koyu bir degrade pahlari kendiliginden ayiriyor.
 		RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-		RenderSettings.ambientSkyColor = new Color(0.42f, 0.44f, 0.49f);
-		RenderSettings.ambientEquatorColor = new Color(0.33f, 0.34f, 0.37f);
-		RenderSettings.ambientGroundColor = new Color(0.22f, 0.21f, 0.23f);
+		RenderSettings.ambientSkyColor = new Color(0.64f, 0.68f, 0.76f);
+		RenderSettings.ambientEquatorColor = new Color(0.50f, 0.51f, 0.55f);
+		RenderSettings.ambientGroundColor = new Color(0.32f, 0.31f, 0.34f);
 
 		Build();
 		SetupCamera();
@@ -332,6 +345,17 @@ public class StackPrototype : MonoBehaviour
 		var m = new Material(sh);
 		m.color = c;
 		return m;
+	}
+
+	// Rozet rengi: parcanin isik altindaki hali. Kirpilma da bilerek aynen
+	// birakiliyor, tahtada da ayni sekilde kirpiliyor.
+	private static Color Swatch(int tone)
+	{
+		Color c = PieceTone[tone];
+		return new Color(
+			Mathf.Min(1f, c.r * LitMul.r),
+			Mathf.Min(1f, c.g * LitMul.g),
+			Mathf.Min(1f, c.b * LitMul.b));
 	}
 
 	private static bool InHalf(int k, int tx, int ty)
@@ -1789,22 +1813,22 @@ public class StackPrototype : MonoBehaviour
 				// Dolu yarim tahtada DURAN parca, ici bos olan SENIN getirecegin
 				// renk. Iki renkli duz bir kare hangisini hangisine goturecegini
 				// soylemiyordu; en cok takilan yer burasiydi.
-				GUI.color = PieceTone[wantB];
+				GUI.color = Swatch(wantB);
 				GUI.DrawTexture(r, halfTex[wantOri ^ 3]);
 
 				// Renk zaten elindeyse bos yarim doluyor: soru artik hangisini
 				// getirecegin degil, nereye basacagin.
-				var ghost = PieceTone[wantA];
+				var ghost = Swatch(wantA);
 				if (carry != wantA)
 					ghost.a = 0.28f;
 				GUI.color = ghost;
 				GUI.DrawTexture(r, halfTex[wantOri]);
-				GUI.color = PieceTone[wantA];
+				GUI.color = Swatch(wantA);
 				GUI.DrawTexture(r, edgeTex[wantOri]);
 			}
 			else
 			{
-				GUI.color = PieceTone[objTone];
+				GUI.color = Swatch(objTone);
 				GUI.DrawTexture(r, upTex);
 			}
 			GUI.color = oc;

@@ -190,16 +190,16 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
    olmasi sart: sahne calisma aninda kuruldugu icin hicbir materyal shaderi referans
    etmiyor ve derlemede silinirdi. `Shiny` ayari kapatilinca Legacy Diffuse'e doner,
    yani A/B karsilastirmasi telefonda yapilabiliyor.
-3. **Iki isik + degrade ortam isigi.** Siddetler keyfi degil, KALIBRE: ust yuze dusen
-   toplam carpan (gunes * sin52 + dolgu * sin26 + gok ortami) 1.0 civarinda tutuluyor,
-   boylece parca tahtada kendi rengiyle goruluyor ve ustteki gorev rozetiyle ayni okunuyor.
-   Renk uzayi Gamma (`m_ActiveColorSpace: 0`) oldugu icin carpan dogrudan sRGB degeri
-   uzerinde isliyor, yani 1.0 birebir esitlik demek. Onceki degerlerde carpan 1.6 idi:
-   doygun kirmizi beyaza kirpiliyor, rozetle tahta birbirini tutmuyordu. Isik degerlerini
-   degistirirken bu carpani korumak gerekiyor.
-   Tek isikta golgede kalan yuzler duzlesiyor ve yan
+3. **Iki isik + degrade ortam isigi.** Tek isikta golgede kalan yuzler duzlesiyor ve yan
    yuz govdeden ayirt edilemiyordu; karsi yondan soguk bir dolgu kondu. Ortam isigi tek
    renk yerine Trilight: ustten acik, altta koyu.
+
+   Isik siddetleri bir kez KALIBRE edildi: ust yuze dusen toplam carpan (gunes * sin52 +
+   dolgu * sin26 + gok ortami) 1.0a cekilince tahtadaki renk gorev rozetiyle birebir
+   esitleniyor - renk uzayi Gamma oldugu icin carpan dogrudan sRGB degeri uzerinde
+   isliyor. Ama parlak hali (carpan ~1.6) daha iyi bulundu ve kalibrasyon GERI ALINDI
+   (7168a27 revert). Yani rozetle tahtanin tam ayni renk olmamasi bilinen ve kabul
+   edilmis bir sonuc; tekrar duzeltmeye kalkisma.
 
 Blender hala masada ama parca KAYNAGI olarak degil: ucgen `Inset` / `TriThick` / `Bevel`
 ayarlarina bagli uretildigi icin FBX getirmek o bagi koparir (pivot dik aci yerelde (0,0),
