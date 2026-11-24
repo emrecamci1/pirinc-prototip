@@ -15,9 +15,16 @@ using UnityEngine;
 //
 // Parcanin ustune devrilince onu yok etmiyorsun, RENGINI aliyorsun.
 //
-// HEDEFE DOKUN, GERISINI UCGEN HALLETSIN. Tahtada basilabilir herhangi bir
-// yarima dokununca en kisa yol bulunup takla takla oynatiliyor. Kenar kenar
-// yurutmek bulmacanin kendisi degil, sadece zahmetiydi.
+// PARMAGINI BASILI TUT, UCGEN O YONE AKAR. Yon her karede, hamle secimi de her
+// varista yeniden okunuyor: oyuncu rota gondermiyor, direksiyon tutuyor.
+// Onceden hedefe dokunulup en kisa yol oynatiliyordu; hareket oyuncunun degil
+// animasyonun oluyordu ve aradaki yurume olu zamandi.
+//
+// Ucgen kenarindan DEVRILMIYOR artik, kayiyor: agirlik merkezi iki hucre
+// arasinda duz bir cizgide sabit hizla gidiyor, govde de yol boyunca kendi
+// merkezi etrafinda yeni yonune donuyor. Takla, 180 derecelik donus karsiligi
+// yarim hucre ilerledigi ve her adim sifirda baslayip sifirda bittigi icin
+// akmiyordu; sorun egri degil, geometriydi.
 //
 // GEREKMEYEN PARCANIN USTUNDEN GECERSIN. Yok olmaz, yolunu da kesmez: ucgen
 // onun ustune binip devam eder (bir TriThick yukarida durur). Boylece ayni
@@ -41,18 +48,16 @@ using UnityEngine;
 // parcalar seninle beraber dusuyor.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 13;
+	private const int DefaultsVersion = 14;
 
 	// Ekranin sag ustunde yazar: telefonda hangi surumu oynadigin belli olsun diye.
 	// Her itilen degisiklikte bir artar ve ayni numara git etiketi olarak atilir,
 	// yani "v6 daha iyiydi" demek o surume birebir donmeye yetiyor. SURUMLER.md
 	// hangi numarada ne degistigini tutuyor.
-	private const string Version = "v4";
+	private const string Version = "v5";
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
-	private static readonly int[] DirX = { 1, -1, 0, 0 };
-	private static readonly int[] DirY = { 0, 0, 1, -1 };
 	private static readonly float[] OriAngle = { 0f, 270f, 90f, 180f };
 
 	// Ucgenin kenari uctur, dolayisiyla hamlesi de uctur.
@@ -102,8 +107,10 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float FogAmount = 0.8f;
 	[System.NonSerialized] public float HintSize = 0.42f;
 	[System.NonSerialized] public float PieceRatio = 0.26f;
-	[System.NonSerialized] public float TumbleTime = 0.13f;
-	[System.NonSerialized] public float HopHeight = 0.06f;
+	// Birim/saniye. Adimlarin uzunlugu farkli (bacak 0.62, hipotenus 0.44) ama
+	// hiz ayni: zincir boyunca tempo sabit kaliyor, hucre sinirinda tokluk yok.
+	[System.NonSerialized] public float MoveSpeed = 4.2f;
+	[System.NonSerialized] public float HopHeight = 0.03f;
 	[System.NonSerialized] public float PopTime = 0.22f;
 	[System.NonSerialized] public float DropTime = 0.5f;
 	[System.NonSerialized] public float TriThick = 0.11f;
@@ -115,7 +122,21 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float CamPitch = 52f;
 	[System.NonSerialized] public float CamZoom = 1f;
 	[System.NonSerialized] public bool Hints = true;
-	[System.NonSerialized] public float SwipeMin = 90f;
+	// Parmak ucgene bu kadar yakinsa yon okunmuyor: oyuncu kendi uzerine
+	// basarak duruyor.
+	private const float DeadZone = 0.5f;
+
+	// Hizin sifirdan tama cikis ve inis suresi. Yumusama ADIM BASINA degil
+	// zincirin ucunda: ilk adim yumusak baslar, son adim yumusak biter,
+	// aradakilerin hepsi tam hizda. Akiskanlik tam olarak buradan geliyor.
+	private const float FlowUp = 0.10f;
+	private const float FlowDown = 0.08f;
+
+	// Donusun ust siniri, derece/saniye. Bacak adimi 90, hipotenus adimi 180
+	// derece donuyor ama hipotenus YOLU daha kisa: sirf mesafeye gore surulse
+	// kisa adim iki kati aciyi yariya yakin surede donerdi ve o adim cirpinma
+	// gibi okunurdu. Sinir ikisinin suresini de ~0.15 saniyede bulusturuyor.
+	private const float SpinSpeed = 1200f;
 
 	private struct Piece
 	{
@@ -142,7 +163,6 @@ public class StackPrototype : MonoBehaviour
 	private Material matHole;
 	private Material matHint;
 	private Material matHintTake;
-	private Material matGoal;
 	private Material[] matFloor;
 	private Material[] matFloorAlt;
 	private Material[] matPiece;
@@ -164,14 +184,19 @@ public class StackPrototype : MonoBehaviour
 	private int myLay, myCx, myCy, myOri;
 	private int activeLay;
 
-	private bool tumbling;
-	private float tumbleT;
-	private Vector3 tumblePivot;
-	private Vector3 tumbleAxis;
-	private Vector3 tumbleFromPos;
-	private Quaternion tumbleFromRot;
+	// Agirlik merkezi yerelde daima burasi: ucler iceri alinirken merkeze dogru
+	// lerplendigi icin bosluk ayari merkezi kaydirmiyor.
+	private static readonly Vector3 CLocal = new Vector3(1f / 3f, 0f, 1f / 3f);
+
+	private bool moving;
+	private float glideT;
+	private float stepDur;
+	private Vector3 glideFromC, glideToC;
+	private Quaternion glideFromRot, glideToRot;
+	private float glideFromLift, glideToLift;
+	private float flow;
+	private Vector3 steer;
 	private int pendingCx, pendingCy, pendingOri;
-	private float tumbleFromLift, tumbleToLift;
 	private int takeA, takeB;
 
 	private bool dropping;
@@ -183,14 +208,6 @@ public class StackPrototype : MonoBehaviour
 	private readonly List<Vector3> dropTo = new List<Vector3>();
 
 	private Transform[] hints;
-	private Transform goalMark;
-	private readonly List<int> pathMoves = new List<int>();
-	private int pathAt;
-	private int pathGoal = -1;
-	private bool[] pathSeen;
-	private int[] pathFrom;
-	private int[] pathVia;
-	private int[] pathQueue;
 	private readonly List<int> popping = new List<int>();
 	private readonly List<float> popT = new List<float>();
 	private readonly List<Move> history = new List<Move>();
@@ -231,10 +248,8 @@ public class StackPrototype : MonoBehaviour
 	private float focusY;
 	private float focusVelY;
 	private Vector2Int camScreen;
-	private Vector2 pressPos;
-	private bool pressed;
-	private Vector2 tapPos;
-	private bool tapped;
+	private bool held;
+	private Vector2 heldPos;
 	private bool showPanel;
 	private Vector2 panelScroll;
 	private float panelContent;
@@ -559,33 +574,6 @@ public class StackPrototype : MonoBehaviour
 		no = (lx < 0 ? 1 : 0) | (ly < 0 ? 2 : 0);
 	}
 
-	// Taklanin ekseni: uzerinden devrildigi kenar. Isaret ucgen daima tahtanin
-	// USTUNDEN donsun diye seciliyor.
-	private void Swing(int lay, int cx, int cy, int ori, int m, out Vector3 point, out Vector3 axis)
-	{
-		int rx = cx + (ori & 1);
-		int ry = cy + ((ori >> 1) & 1);
-		int lx = (ori & 1) == 0 ? 1 : -1;
-		int ly = ((ori >> 1) & 1) == 0 ? 1 : -1;
-
-		if (m == 0)
-		{
-			point = CornerToWorld(lay, rx, ry);
-			axis = (CornerToWorld(lay, rx + lx, ry) - point).normalized * (lx * (ly > 0 ? -1f : 1f));
-			return;
-		}
-
-		if (m == 1)
-		{
-			point = CornerToWorld(lay, rx, ry);
-			axis = (CornerToWorld(lay, rx, ry + ly) - point).normalized * (ly * (lx > 0 ? 1f : -1f));
-			return;
-		}
-
-		point = CornerToWorld(lay, rx + lx, ry);
-		axis = (CornerToWorld(lay, rx, ry + ly) - point).normalized * (lx * ly > 0 ? -1f : 1f);
-	}
-
 	// Parcalar engel degil, hedef: uzerine devriliyorsun ve kalkiyorlar. Bu yuzden
 	// tek sinir siluetin kendisi. Hipotenus taklasi hep ayni hucrede kaldigi icin
 	// de her zaman en az bir hamle var: oyun asla kilitlenmiyor.
@@ -646,8 +634,6 @@ public class StackPrototype : MonoBehaviour
 		matMe = MakeMat(new Color(0.97f, 0.97f, 0.99f));
 		matHint = MakeMat(new Color(0.86f, 0.86f, 0.86f));
 		matHintTake = MakeMat(new Color(0.98f, 0.86f, 0.36f));
-		matGoal = MakeMat(new Color(0.22f, 0.24f, 0.29f));
-
 		matHole = MakeMat(new Color(0.12f, 0.12f, 0.15f));
 		matFloor = new Material[Layers];
 		matFloorAlt = new Material[Layers];
@@ -665,10 +651,6 @@ public class StackPrototype : MonoBehaviour
 		onShape = new bool[Layers, gridN, gridN];
 		reach = new bool[Layers, gridN, gridN, 4];
 		occ = new int[Layers, gridN, gridN, 4];
-		pathSeen = new bool[gridN * gridN * 4];
-		pathFrom = new int[gridN * gridN * 4];
-		pathVia = new int[gridN * gridN * 4];
-		pathQueue = new int[gridN * gridN * 4];
 		layerRoot = new Transform[Layers];
 		fogSheet = new Transform[Layers];
 		holeCx = new int[Layers];
@@ -729,8 +711,6 @@ public class StackPrototype : MonoBehaviour
 			hints[i].gameObject.SetActive(false);
 		}
 
-		goalMark = MakeTri("Goal", hintMesh, matGoal, board);
-		goalMark.gameObject.SetActive(false);
 
 		var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
 		var cubeMesh = cube.GetComponent<MeshFilter>().sharedMesh;
@@ -746,7 +726,6 @@ public class StackPrototype : MonoBehaviour
 
 		steps = 0;
 		tasks = 0;
-		ClearPath();
 		carry = -1;
 		objKind = -1;
 		objTone = -1;
@@ -755,7 +734,9 @@ public class StackPrototype : MonoBehaviour
 		solved = false;
 		lost = false;
 		lostText = "";
-		tumbling = false;
+		moving = false;
+		flow = 0f;
+		steer = Vector3.zero;
 		dropping = false;
 		shardAt = 0;
 		history.Clear();
@@ -951,36 +932,20 @@ public class StackPrototype : MonoBehaviour
 		if (Input.GetKeyDown(KeyCode.Tab))
 			showPanel = !showPanel;
 
-		// Dokunus takla ve inis sirasinda da yakalaniyor. Birakma olayi tek kare
-		// surdugu icin animasyonun bitmesi beklenirse dokunus tamamen kayboluyor;
-		// yururken yon degistirmek de boylece mumkun oluyor.
-		if (!showPanel || Input.mousePosition.x < panelLeft)
-		{
-			if (Input.GetMouseButtonDown(0))
-			{
-				pressPos = Input.mousePosition;
-				pressed = true;
-			}
-			else if (pressed && Input.GetMouseButtonUp(0))
-			{
-				pressed = false;
-				tapped = true;
-				tapPos = Input.mousePosition;
-			}
-		}
+		// Birakma anini beklemek yok: parmak BASILI oldugu surece yon veriyor.
+		// Panel acikken sagdaki serit paneldir; sag ust kose de Ayar dugmesiyle
+		// surum yazisinindir. Ikisinde de yon okunmuyor, yoksa paneli acmak
+		// ucgeni bir adim seyirtiyor.
+		float gs = Mathf.Max(Screen.width, Screen.height) / 900f;
+		held = Input.GetMouseButton(0)
+			&& (!showPanel || Input.mousePosition.x < panelLeft)
+			&& !(Input.mousePosition.x > Screen.width - 115f * gs
+				&& Input.mousePosition.y > Screen.height - 80f * gs);
+		heldPos = Input.mousePosition;
 
 		if (dropping)
 		{
-			// Inis sirasindaki dokunus atiliyor: ekran koordinati yeni katin
-			// duzlemine goturulurse oyuncunun bakmadigi bir kareye donusuyor.
-			tapped = false;
 			StepDrop();
-			return;
-		}
-
-		if (tumbling)
-		{
-			StepTumble();
 			return;
 		}
 
@@ -1004,181 +969,96 @@ public class StackPrototype : MonoBehaviour
 
 		if (solved || lost)
 		{
-			tapped = false;
+			flow = 0f;
 			return;
 		}
 
-		// Girdi once okunuyor: yurume sirasinda gelen dokunus yolu bastan kurar.
-		ReadInput();
+		steer = ReadSteer();
+		bool want = steer.sqrMagnitude > 0.0001f;
+		flow = Mathf.MoveTowards(flow, want ? 1f : 0f,
+			Time.deltaTime / (want ? FlowUp : FlowDown));
 
-		// Planlanmis yol kendiliginden oynuyor.
-		if (!tumbling && pathAt < pathMoves.Count)
-			TryMove(pathMoves[pathAt++]);
+		if (moving)
+			StepGlide();
+		else if (want)
+			StartStep();
 
 		UpdateHints();
 	}
 
-	private void ReadInput()
+	// Yon, parmagin tahtada durdugu nokta eksi ucgenin su anki yeri. Ekranda bir
+	// kol yok, parmagin kendisi kol: ucgen parmaga dogru akiyor, parmak kayinca
+	// yon ayni karede degisiyor.
+	private Vector3 ReadSteer()
 	{
-		if (!tapped)
-			return;
+		Vector3 key = Vector3.zero;
+		if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
+			key.z += 1f;
+		if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
+			key.z -= 1f;
+		if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
+			key.x += 1f;
+		if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
+			key.x -= 1f;
+		if (key.sqrMagnitude > 0f)
+			return key.normalized;
 
-		tapped = false;
-		Vector2 delta = tapPos - pressPos;
-		float scale = Mathf.Max(Screen.width, Screen.height) / 900f;
-		if (delta.magnitude > SwipeMin * scale)
-		{
-			int m = Steer(Mathf.Abs(delta.x) > Mathf.Abs(delta.y) ? (delta.x > 0f ? 0 : 1) : (delta.y > 0f ? 2 : 3));
-			if (m >= 0)
-				TryMove(m);
-			return;
-		}
+		if (!held)
+			return Vector3.zero;
 
-		int goal = TapTarget(tapPos);
-		if (goal >= 0)
-			PlanPath(goal);
-	}
-
-
-	private int Steer(int dir)
-	{
-		int wx = myCx + DirX[dir];
-		int wy = myCy + DirY[dir];
-
-		// Iki bacaktan hangisi o yone goturuyorsa o. Goturen yoksa hamle yok:
-		// ucgenin o anda nereye devrilebildigini yonerge ucgenleri gosteriyor.
-		for (int m = 0; m < 2; m++)
-		{
-			Target(myCx, myCy, myOri, m, out int nx, out int ny, out int _);
-			if (nx == wx && ny == wy && Landing(myLay, myCx, myCy, myOri, m, out _, out _, out _))
-				return m;
-		}
-		return -1;
-	}
-
-	// Dokunulan yarim. Parmak dogrudan o yarimin uzerine denk gelmese bile
-	// dokundugun KARE yetiyor: karenin iki basilabilir yarisindan dokunusun
-	// dustugu taraf seciliyor, yani kosegenin hangi yaninda oldugun. Nisana
-	// nisan alma devri bitti, artik tahtanin herhangi bir yerine dokunuluyor.
-	private int TapTarget(Vector3 screen)
-	{
-		if (!PickFine(screen, out int cx, out int cy, out float fx, out float fy))
-			return -1;
-		if (cx < 0 || cy < 0 || cx >= gridN || cy >= gridN)
-			return -1;
-		if (!Shape(myLay, cx, cy))
-			return -1;
-
-		int o0 = DiagOri(cx, cy, 0);
-		int ori = Inside(o0, fx, fy) ? o0 : DiagOri(cx, cy, 1);
-		if (!reach[myLay, cx, cy, ori])
-			return -1;
-
-		return (cx * gridN + cy) * 4 + ori;
-	}
-
-	private void ClearPath()
-	{
-		pathMoves.Clear();
-		pathAt = 0;
-		pathGoal = -1;
-	}
-
-	// Hedefe en kisa yol: durumlar (kare, yarim) ve uc hamle uzerinde genislik
-	// aramasi. Tahta kucuk (en fazla gridN * gridN * 4 durum), her dokunusta
-	// bastan calistirmak bedava sayilir.
-	//
-	// Yol uzerinde gorevin istedigi bir parcaya basilirsa o da aliniyor; bu
-	// kayip degil, cunku kare gorevinde yalniz TASINAN renk kalkiyor ve zaten
-	// elinde o renk var, tek renk gorevinde ise her dogru renk sayiya yaziyor.
-	private void PlanPath(int goal)
-	{
-		ClearPath();
-
-		int start = (myCx * gridN + myCy) * 4 + myOri;
-		if (goal == start)
-			return;
-
-		int n = gridN * gridN * 4;
-		for (int i = 0; i < n; i++)
-			pathSeen[i] = false;
-
-		int head = 0;
-		int tail = 0;
-		pathSeen[start] = true;
-		pathQueue[tail++] = start;
-
-		while (head < tail)
-		{
-			int v = pathQueue[head++];
-			int o = v & 3;
-			int y = (v >> 2) % gridN;
-			int x = (v >> 2) / gridN;
-
-			for (int m = 0; m < MoveCount; m++)
-			{
-				if (!Landing(myLay, x, y, o, m, out int nx, out int ny, out int no))
-					continue;
-
-				int w = (nx * gridN + ny) * 4 + no;
-				if (pathSeen[w])
-					continue;
-
-				pathSeen[w] = true;
-				pathFrom[w] = v;
-				pathVia[w] = m;
-				pathQueue[tail++] = w;
-
-				if (w != goal)
-					continue;
-
-				for (int c = goal; c != start; c = pathFrom[c])
-					pathMoves.Add(pathVia[c]);
-				pathMoves.Reverse();
-				pathGoal = goal;
-				return;
-			}
-		}
-	}
-
-	private static bool Inside(int ori, float fx, float fy)
-	{
-		switch (ori)
-		{
-			case 0: return fx + fy < 1f;
-			case 3: return fx + fy > 1f;
-			case 1: return fy < fx;
-			default: return fy > fx;
-		}
-	}
-
-	private bool PickFine(Vector3 screen, out int cell, out int row, out float fx, out float fy)
-	{
-		cell = 0;
-		row = 0;
-		fx = 0f;
-		fy = 0f;
-
-		var ray = cam.ScreenPointToRay(screen);
+		var ray = cam.ScreenPointToRay(heldPos);
 		var plane = new Plane(Vector3.up, new Vector3(0f, LayerY(myLay), 0f));
 		if (!plane.Raycast(ray, out float dist))
-			return false;
+			return Vector3.zero;
 
-		Vector3 flat = ray.GetPoint(dist);
-		float gx = flat.x + gridN * 0.5f;
-		float gy = flat.z + gridN * 0.5f;
-		cell = Mathf.FloorToInt(gx);
-		row = Mathf.FloorToInt(gy);
-		fx = gx - Mathf.Floor(gx);
-		fy = gy - Mathf.Floor(gy);
-		return true;
+		// Olculen yer HUCRE degil, ucgenin o andaki gercek yeri: adimin ortasinda
+		// parmak kayarsa yon biraktigi hucreden degil bulundugu yerden okunur.
+		Vector3 here = moving
+			? Vector3.Lerp(glideFromC, glideToC, Mathf.Clamp01(glideT))
+			: Centroid(myLay, myCx, myCy, myOri);
+
+		Vector3 d = ray.GetPoint(dist) - here;
+		d.y = 0f;
+		return d.magnitude < DeadZone ? Vector3.zero : d.normalized;
+	}
+
+	private Vector3 Centroid(int lay, int cx, int cy, int ori)
+	{
+		return StateToPos(lay, cx, cy, ori) + StateToRot(ori) * CLocal;
 	}
 
 	// --- hamle ---
 
-	private void TryMove(int m)
+	// Uc kenardan hangisi verilen yone en cok goturuyorsa o seciliyor. Ucgenin
+	// uc cikisi 90 ve 135 derecelik araliklarla dagildigi icin hangi yone
+	// basilirsa basilsin en kotu sapma 67.5 derece: direksiyon asla bosa
+	// dusmuyor, her yon icin daima gercekten o tarafa giden bir cikis var.
+	private void StartStep()
 	{
-		if (!Landing(myLay, myCx, myCy, myOri, m, out pendingCx, out pendingCy, out pendingOri))
+		Vector3 from = Centroid(myLay, myCx, myCy, myOri);
+		Vector3 to = from;
+		float best = 0f;
+		bool found = false;
+
+		for (int m = 0; m < MoveCount; m++)
+		{
+			if (!Landing(myLay, myCx, myCy, myOri, m, out int nx, out int ny, out int no))
+				continue;
+
+			Vector3 c = Centroid(myLay, nx, ny, no);
+			float d = Vector3.Dot((c - from).normalized, steer);
+			if (d <= best)
+				continue;
+
+			best = d;
+			to = c;
+			found = true;
+			pendingCx = nx;
+			pendingCy = ny;
+			pendingOri = no;
+		}
+
+		if (!found)
 			return;
 
 		takeA = Pick(pendingCx, pendingCy, pendingOri);
@@ -1190,8 +1070,8 @@ public class StackPrototype : MonoBehaviour
 		}
 
 		// Kalkmayacak bir parcanin ustune biniyorsak inis bir kat yukarida.
-		tumbleFromLift = occ[myLay, myCx, myCy, myOri] != 0 ? TriThick : 0f;
-		tumbleToLift = occ[myLay, pendingCx, pendingCy, pendingOri] != 0 && takeA < 0 ? TriThick : 0f;
+		glideFromLift = occ[myLay, myCx, myCy, myOri] != 0 ? TriThick : 0f;
+		glideToLift = occ[myLay, pendingCx, pendingCy, pendingOri] != 0 && takeA < 0 ? TriThick : 0f;
 
 		history.Add(new Move
 		{
@@ -1201,36 +1081,58 @@ public class StackPrototype : MonoBehaviour
 			WOri = wantOri
 		});
 
-		Swing(myLay, myCx, myCy, myOri, m, out tumblePivot, out tumbleAxis);
-		// Takla hesabi binisi gormemeli: yukseklik ayri bir rampa olarak ekleniyor,
-		// yoksa kaldirilmis baslangic noktasi donup zeminin ALTINA iniyor.
-		tumbleFromPos = StateToPos(myLay, myCx, myCy, myOri);
-		tumbleFromRot = me.rotation;
-		tumbleT = 0f;
-		tumbling = true;
+		// Yol agirlik merkezleri arasinda olculuyor, kose noktalari arasinda
+		// degil: govde kendi merkezi etrafinda donsun, merkez duz gitsin diye.
+		glideFromC = from;
+		glideToC = to;
+		glideFromRot = StateToRot(myOri);
+		glideToRot = StateToRot(pendingOri);
+		stepDur = Mathf.Max(
+			Vector3.Distance(from, to) / Mathf.Max(0.1f, MoveSpeed),
+			Quaternion.Angle(glideFromRot, glideToRot) / SpinSpeed);
+		glideT = 0f;
+		moving = true;
 
 		steps++;
 	}
 
-	private void StepTumble()
+	private void StepGlide()
 	{
-		tumbleT += Time.deltaTime / Mathf.Max(0.02f, TumbleTime);
-		float t = Mathf.Clamp01(tumbleT);
+		// Parmak kalksa bile baslanan adim tamamlaniyor: ucgen iki hucrenin
+		// arasinda kalmiyor. Yavasliyor ama iniyor.
+		glideT += Time.deltaTime * Mathf.Max(flow, 0.35f) / Mathf.Max(0.01f, stepDur);
+
+		float t = Mathf.Clamp01(glideT);
+
+		// KONUM dogrusal: adim basina hizlanma-yavaslama yok, yumusama zincirin
+		// iki ucunda flow uzerinden oluyor. DONUS ise adim icinde yumusuyor,
+		// yoksa her hucre sinirinda acisal hiz takirdiyor.
 		float e = t * t * (3f - 2f * t);
-
-		// Kenarin uzerinden devrilirken hafif bir yay: ucgen kendi kalinligi
-		// yuzunden zemine surtmesin diye.
-		float lift = Mathf.Sin(e * Mathf.PI);
-
-		var rot = Quaternion.AngleAxis(180f * e, tumbleAxis);
-		me.position = tumblePivot + rot * (tumbleFromPos - tumblePivot)
-			+ Vector3.up * (lift * HopHeight + Mathf.Lerp(tumbleFromLift, tumbleToLift, e));
-		me.rotation = rot * tumbleFromRot;
+		var rot = Quaternion.Slerp(glideFromRot, glideToRot, e);
+		me.rotation = rot;
+		me.position = Vector3.Lerp(glideFromC, glideToC, t) - rot * CLocal
+			+ Vector3.up * (Mathf.Sin(t * Mathf.PI) * HopHeight
+				+ Mathf.Lerp(glideFromLift, glideToLift, t));
 
 		if (t < 1f)
 			return;
 
-		tumbling = false;
+		float over = (glideT - 1f) * stepDur;
+		moving = false;
+		Arrive();
+
+		// Yon hala duruyorsa siradaki adim AYNI KAREDE basliyor ve asan mesafe
+		// devrediliyor: hucre sinirinda tek kare bile duraklama olmuyor.
+		if (dropping || solved || lost || steer.sqrMagnitude <= 0.0001f)
+			return;
+
+		StartStep();
+		if (moving)
+			glideT = Mathf.Clamp01(over / Mathf.Max(0.01f, stepDur));
+	}
+
+	private void Arrive()
+	{
 		myCx = pendingCx;
 		myCy = pendingCy;
 		myOri = pendingOri;
@@ -1298,8 +1200,6 @@ public class StackPrototype : MonoBehaviour
 	private void CompleteTask()
 	{
 		tasks++;
-		// Gorev degisti, eski hedef artik baska bir seyin pesindeydi.
-		ClearPath();
 		NextTask();
 	}
 
@@ -1495,8 +1395,9 @@ public class StackPrototype : MonoBehaviour
 
 		for (int i = 0; i < MoveCount; i++)
 			hints[i].gameObject.SetActive(false);
-		goalMark.gameObject.SetActive(false);
-		ClearPath();
+
+		// Inis bir duraktir: yeni katta hiz sifirdan kuruluyor.
+		flow = 0f;
 
 		// Yeni katta hangi renkler var belli degil; gorev bastan seciliyor.
 		NextTask();
@@ -1577,14 +1478,13 @@ public class StackPrototype : MonoBehaviour
 	// serbest, kat atladiktan sonra R ile bastan.
 	private void Undo()
 	{
-		if (history.Count == 0 || tumbling || dropping || solved)
+		if (history.Count == 0 || moving || dropping || solved)
 			return;
 
 		var mv = history[history.Count - 1];
 		if (mv.Lay != myLay || mv.Dove)
 			return;
 
-		ClearPath();
 		history.RemoveAt(history.Count - 1);
 		Revive(mv.A);
 		Revive(mv.B);
@@ -1636,20 +1536,9 @@ public class StackPrototype : MonoBehaviour
 		if (hints == null)
 			return;
 
-		// Gidilen yer isaretli kaliyor: dokundugun seye gercekten yoneldigini
-		// yol bitmeden gormek gerekiyor.
-		bool walking = pathAt < pathMoves.Count && pathGoal >= 0;
-		goalMark.gameObject.SetActive(walking);
-		if (walking)
-		{
-			int go = pathGoal & 3;
-			int gy = (pathGoal >> 2) % gridN;
-			int gx = (pathGoal >> 2) / gridN;
-			goalMark.position = MePos(myLay, gx, gy, go) + Vector3.down * (TriThick * 0.5f - 0.004f);
-			goalMark.rotation = StateToRot(go);
-		}
-
-		bool live = Hints && !tumbling && !dropping && !solved && !lost;
+		// Yonerge dururken gosteriliyor: akarken zaten parmagi takip ediyorsun,
+		// uc kucuk isaret o sirada sadece titreyen bir gurultu olurdu.
+		bool live = Hints && !moving && !dropping && !solved && !lost;
 		for (int m = 0; m < MoveCount; m++)
 		{
 			int nx = 0;
@@ -1932,9 +1821,9 @@ public class StackPrototype : MonoBehaviour
 		Slider(ref SlabRatio, 0.1f, 1.6f, "Kat govde yuksekligi", x, ref y, w, s, true);
 		Slider(ref FogAmount, 0f, 0.93f, "En alt kat sisi", x, ref y, w, s, true);
 		Slider(ref HintSize, 0.12f, 0.9f, "Yonerge boyutu", x, ref y, w, s, true);
-		Slider(ref TumbleTime, 0.05f, 0.4f, "Takla suresi", x, ref y, w, s, false);
+		Slider(ref MoveSpeed, 1.5f, 9f, "Hiz", x, ref y, w, s, false);
 		Slider(ref DropTime, 0.15f, 1.2f, "Inis suresi", x, ref y, w, s, false);
-		Slider(ref HopHeight, 0f, 0.3f, "Takla yayi", x, ref y, w, s, false);
+		Slider(ref HopHeight, 0f, 0.3f, "Ziplama", x, ref y, w, s, false);
 		Slider(ref TriThick, 0.04f, 0.3f, "Ucgen kalinlik", x, ref y, w, s, true);
 		Slider(ref Bevel, 0f, 0.05f, "Pah genisligi", x, ref y, w, s, true);
 		Slider(ref Inset, 0f, 0.25f, "Ucgen bosluk", x, ref y, w, s, true);
@@ -1944,7 +1833,7 @@ public class StackPrototype : MonoBehaviour
 
 		GUI.Label(new Rect(x, y, w, 26f * s), "Tohum: " + seed);
 		y += 32f * s;
-		GUI.Label(new Rect(x, y, w, 26f * s), "Gitmek istedigin yere dokun");
+		GUI.Label(new Rect(x, y, w, 26f * s), "Basili tut, o yone akarsin");
 		y += 26f * s;
 		GUI.Label(new Rect(x, y, w, 26f * s), "Parcaya basinca rengini alirsin");
 		y += 26f * s;
@@ -2003,7 +1892,7 @@ public class StackPrototype : MonoBehaviour
 		SlabRatio = PlayerPrefs.GetFloat("stk_slab", SlabRatio);
 		FogAmount = PlayerPrefs.GetFloat("stk_fog", FogAmount);
 		HintSize = PlayerPrefs.GetFloat("stk_hsz", HintSize);
-		TumbleTime = PlayerPrefs.GetFloat("stk_tt", TumbleTime);
+		MoveSpeed = PlayerPrefs.GetFloat("stk_spd", MoveSpeed);
 		DropTime = PlayerPrefs.GetFloat("stk_dt", DropTime);
 		HopHeight = PlayerPrefs.GetFloat("stk_hop", HopHeight);
 		TriThick = PlayerPrefs.GetFloat("stk_th", TriThick);
@@ -2028,7 +1917,7 @@ public class StackPrototype : MonoBehaviour
 		PlayerPrefs.SetFloat("stk_slab", SlabRatio);
 		PlayerPrefs.SetFloat("stk_fog", FogAmount);
 		PlayerPrefs.SetFloat("stk_hsz", HintSize);
-		PlayerPrefs.SetFloat("stk_tt", TumbleTime);
+		PlayerPrefs.SetFloat("stk_spd", MoveSpeed);
 		PlayerPrefs.SetFloat("stk_dt", DropTime);
 		PlayerPrefs.SetFloat("stk_hop", HopHeight);
 		PlayerPrefs.SetFloat("stk_th", TriThick);

@@ -133,8 +133,8 @@ sabiti degisince kayitli degerler gecersiz oluyor.
 2. Sureli gorevler: bazilari saatli olsun ("40 saniyede mavi"), hepsi degil. Gorev tipleri
    (tek renk / kare) hazir, geriye sure ve kaybetme kaliyor. `lost` / `lostText` duruyor
    ama su an hicbir yerden set edilmiyor.
-
-   duruyor ama su an hicbir yerden set edilmiyor.
+3. Hareket v5 ile tamamen degisti. Ilk olculecek sey: akiskanlik geldi mi, ve
+   parmakla surmek bulmacayi kolaylastirip anlamsizlastirdi mi.
 4. Masada duran kural adayi: ustunden ayrildigin kare arkanda kapaniyor.
 
 ## Iki makine
@@ -173,10 +173,68 @@ dik aci kosesinden iki bacak yonunde birer bolu uc.
 
 ## Kumanda
 
-Tek sey: nisana dokun. `TapRadius` yaricapi icindeki en yakin nisan secilir,
-disina dokunmak hicbir sey yapmaz. Klavye kisayollari kaldirildi (harfler
-gorunmeyince hangi tusun nereye goturdugu bilinemiyordu). Duran tuslar:
+**Parmagini basili tut, ucgen o yone akar.** Parmagin kendisi koldur: ucgen
+parmaga dogru gider, parmak kayinca yon ayni karede degisir, parmagin altina
+varinca durur (`DeadZone` 0.5). Birakinca yavaslayarak son hucresine iner.
+
+Hedefe dokunup yol oynatma KALKTI - sebebi asagida, "Hareket" bolumunde.
+
+Editorde WASD / ok tuslari da yon veriyor (telefonsuz test icin). Duran tuslar:
 R yeniden kur, N yeni board, Z geri al, Tab ayar paneli.
+
+Sag ust kosede (Ayar dugmesi + surum yazisi) yon OKUNMUYOR: yoksa paneli acmak
+ucgeni bir adim seyirtiyordu.
+
+## Hareket (v5)
+
+Takla biciminde ilerleme KALDIRILDI. Emre'nin verdigi hukum: "takla atarak
+ilerlemesi zevkli akiskan hissettirmedi". Sorun ayar degil geometriydi, uc
+tane:
+
+1. **Oyuncu ucgeni hareket ettirmiyordu, hedef secip izliyordu.** Tek dokunusla
+   BFS en kisa yolu buluyor ve adimlari kendisi oynatiyordu. Hissiyatin
+   kacmasinin ASIL sebebi bu: adim adim verilen karar yok, aradaki yurume olu
+   zaman.
+2. **Taklanin donusu mesafesine gore cok fazla.** Dik ucgenin agirlik merkezi
+   dik koseden (1/3, 1/3): bacaktan takla 180 derece donup 0.62 hucre, hipotenus
+   taklasi 180 derece donup 0.44 hucre gidiyor. Yuvarlanan bir kup 90 derecede
+   1.00 hucre gidiyor - yani ucgen ayni mesafe icin kupun uc-dort kati donuyor.
+   Cok cabalayip az ilerleyen bir sey izleniyordu.
+3. **Her adim sifirda baslayip sifirda bitiyordu.** `t*t*(3-2t)` hem ease-in hem
+   ease-out. Bes hucre yurumek bes ayri duraksama demekti.
+
+Yerine gelen: agirlik merkezi iki hucre arasinda DUZ bir cizgide sabit hizla
+gidiyor, govde yol boyunca kendi merkezi etrafinda yeni yonune donuyor. Donus
+artik ilerlemenin kendisi degil, yan urunu.
+
+- **Agirlik merkezi** yerelde daima `(1/3, 0, 1/3)` (`CLocal`). `Inset` ucleri
+  merkeze dogru lerpledigi icin bosluk ayari merkezi KAYDIRMIYOR, o yuzden sabit.
+  Konum kose noktasindan degil merkezden kuruluyor: `pos = merkez - rot * CLocal`.
+  Kose uzerinden lerplenseydi merkez egri bir yol izlerdi.
+- **Yumusama adim basina DEGIL, zincirin iki ucunda.** `flow` 0'dan 1'e
+  `FlowUp` 0.10 sn'de cikiyor, birakinca `FlowDown` 0.08 sn'de iniyor; aradaki
+  butun adimlar tam hizda. Akiskanlik tam olarak buradan geliyor.
+- **Baslanan adim her halukarda tamamlaniyor** (`Mathf.Max(flow, 0.35f)`):
+  parmak kalkinca ucgen iki hucrenin arasinda donup kalmiyor, yavaslayarak iniyor.
+- **Hucre sinirinda duraklama yok**: varista asan sure (`over`) siradaki adima
+  devrediliyor ve yeni adim AYNI KAREDE basliyor.
+- **Donus suresi sinirli** (`SpinSpeed` 1200 derece/sn). Sirf mesafeye gore
+  surulseydi hipotenus adimi iki kati aciyi yariya yakin surede donerdi
+  (1730 derece/sn) ve cirpinma gibi okunurdu. Sinir, bacak adimiyla hipotenus
+  adiminin suresini ~0.15 sn'de bulusturuyor.
+- **Yon secimi**: uc cikistan hangisinin merkez farki yone en cok bakiyorsa o.
+  Ucgenin uc cikisi 90 ve 135 derecelik araliklarla dagildigi icin en kotu sapma
+  67.5 derece - yani hangi yone basilirsa basilsin daima gercekten o tarafa giden
+  bir cikis var, direksiyon bosa dusmuyor. Tahta kenarinda cikis kalmazsa duruyor.
+- **Yonerge ucgenleri sadece DURURKEN** gosteriliyor; akarken zaten parmak takip
+  ediliyor, uc kucuk isaret o sirada titreyen gurultu olurdu.
+
+Silinenler: `StepTumble`, `Swing`, `PlanPath`, `TapTarget`, `ClearPath`, `Steer`,
+`PickFine`, `Inside`, yol dizileri, hedef nisani (`goalMark`), `TumbleTime`,
+`SwipeMin`, `DirX` / `DirY`. Hepsi `v4` etiketinde duruyor.
+
+Ayardaki `Hiz` (birim/sn, varsayilan 4.2) ve `Ziplama` (adim basina kucuk yay,
+0.03) bu sistemin iki tutamagi.
 
 ## Gorsel (2026-11-24)
 
