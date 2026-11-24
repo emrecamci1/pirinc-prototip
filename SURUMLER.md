@@ -15,7 +15,7 @@ numaradir. Boylece hicbir ara hal kaybolmaz.
 
 | Surum | Commit | Ne degisti | Karar |
 |-------|--------|------------|-------|
-| v1 | (bu commit) | Gorsel olarak onaylanan hal: pahli kenar, spekular shader, iki isik + degrade ortam isigi. Rozetler ham renkle ciziliyor. Surum etiketi eklendi. | Onayli |
+| v1 | d802569 | Gorsel olarak onaylanan hal: pahli kenar, spekular shader, iki isik + degrade ortam isigi. Rozetler ham renkle ciziliyor. Surum etiketi eklendi. | Onayli |
 
 ## v1 oncesi (numarasiz)
 
