@@ -41,7 +41,7 @@ using UnityEngine;
 // parcalar seninle beraber dusuyor.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 9;
+	private const int DefaultsVersion = 10;
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -89,6 +89,8 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float PopTime = 0.22f;
 	[System.NonSerialized] public float DropTime = 0.5f;
 	[System.NonSerialized] public float TriThick = 0.11f;
+	[System.NonSerialized] public float Bevel = 0.013f;
+	[System.NonSerialized] public bool Shiny = true;
 	private float FloorThick;
 	[System.NonSerialized] public float Inset = 0.07f;
 	[System.NonSerialized] public float FloorInset = 0.11f;
@@ -282,20 +284,41 @@ public class StackPrototype : MonoBehaviour
 		{
 			var lg = new GameObject("Sun").AddComponent<Light>();
 			lg.type = LightType.Directional;
-			lg.intensity = 0.95f;
+			lg.intensity = 1.05f;
 			lg.transform.rotation = Quaternion.Euler(52f, 36f, 0f);
 			// Golge olmadan ust kat alt katin uzerine oturmuyor, havada duruyor.
 			lg.shadows = LightShadows.Soft;
+			lg.shadowStrength = 0.62f;
+
+			// Karsi yondan soguk bir dolgu. Tek isikta golgede kalan yuzler
+			// tamamen duzlesiyor ve parcanin yan yuzu govdesinden ayirt
+			// edilemiyor; hacim esas iki isigin farkindan okunuyor.
+			var fill = new GameObject("Fill").AddComponent<Light>();
+			fill.type = LightType.Directional;
+			fill.intensity = 0.38f;
+			fill.color = new Color(0.70f, 0.79f, 1f);
+			fill.transform.rotation = Quaternion.Euler(26f, -142f, 0f);
+			fill.shadows = LightShadows.None;
 		}
-		RenderSettings.ambientLight = new Color(0.52f, 0.54f, 0.60f);
+
+		// Tek renk ortam isigi her yuzu esit aydinlatip hacmi siliyordu. Ustten
+		// acik, altta koyu bir degrade pahlari kendiliginden ayiriyor.
+		RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+		RenderSettings.ambientSkyColor = new Color(0.64f, 0.68f, 0.76f);
+		RenderSettings.ambientEquatorColor = new Color(0.50f, 0.51f, 0.55f);
+		RenderSettings.ambientGroundColor = new Color(0.32f, 0.31f, 0.34f);
 
 		Build();
 		SetupCamera();
 	}
 
-	private static Material MakeMat(Color c)
+	private Material MakeMat(Color c)
 	{
-		var sh = Shader.Find("Legacy Shaders/Diffuse");
+		// TriLit Resources altinda: sahne calisma aninda kuruldugu icin hicbir
+		// materyal onu referans etmiyor ve normalde derlemede silinirdi.
+		Shader sh = Shiny ? Resources.Load<Shader>("TriLit") : null;
+		if (sh == null)
+			sh = Shader.Find("Legacy Shaders/Diffuse");
 		if (sh == null)
 			sh = Shader.Find("Diffuse");
 		if (sh == null)
@@ -343,7 +366,11 @@ public class StackPrototype : MonoBehaviour
 		t.Add(i + 2);
 	}
 
-	private static Mesh BuildTriMesh(float inset, float thick)
+	// Pahli ucgen prizma. Keskin kenar isigi hic yakalamiyor: kenar bir cizgi
+	// olarak degil, iki yuzun ani rengi degismesi olarak okunuyordu ve yigin
+	// duz bir leke gibi goruluyordu. Ince bir pah o kenari isiga doner, yuzeyin
+	// nerede bittigi gorulur.
+	private static Mesh BuildTriMesh(float inset, float thick, float bevel)
 	{
 		// Dik aci yerelde (0,0), bacaklar +X ve +Z boyunca.
 		Vector3 a = new Vector3(0f, 0f, 0f);
@@ -354,25 +381,69 @@ public class StackPrototype : MonoBehaviour
 		b = Vector3.LerpUnclamped(b, m0, inset);
 		c = Vector3.LerpUnclamped(c, m0, inset);
 
+		// Ic kenarin merkeze dogru kaymasi ICTEGET uzerinden: bir ucgeni her
+		// kenarindan esit mesafe iceri almanin tek dogru yolu bu. Agirlik
+		// merkezine lerp etmek dar acida daha fazla, genis acida daha az
+		// kaydirirdi ve pah genisligi kenardan kenara degisirdi.
+		float la = Vector3.Distance(b, c);
+		float lb = Vector3.Distance(c, a);
+		float lc = Vector3.Distance(a, b);
+		float per = la + lb + lc;
+		Vector3 inc = (la * a + lb * b + lc * c) / per;
+		float rad = Vector3.Cross(b - a, c - a).magnitude / per;
+
+		// Pah ne kalinligi ne de yuzeyi yiyebilir: ince yonergelerde (0.02)
+		// kalinlik, kucuk parcalarda ictegetin kendisi sinirliyor.
+		float bv = Mathf.Min(bevel, thick * 0.4f, rad * 0.5f);
+		bv = Mathf.Max(bv, 0f);
+
+		float k = rad > 0f ? (rad - bv) / rad : 0f;
+		Vector3 ai = Vector3.LerpUnclamped(inc, a, k);
+		Vector3 bi = Vector3.LerpUnclamped(inc, b, k);
+		Vector3 ci = Vector3.LerpUnclamped(inc, c, k);
+
 		// Kalinlik yuzeyin iki yanina esit dagiliyor: 180 derecelik takladan sonra
 		// ucgen yine duzgun oturuyor, zeminin icine gomulmuyor.
-		Vector3 up = Vector3.up * (thick * 0.5f);
+		float h = thick * 0.5f;
+		Vector3 top = Vector3.up * h;
+		Vector3 bot = Vector3.down * h;
+		Vector3 topIn = Vector3.up * (h - bv);
+		Vector3 botIn = Vector3.down * (h - bv);
 
 		var verts = new List<Vector3>();
 		var norms = new List<Vector3>();
 		var tris = new List<int>();
 
-		AddFace(verts, norms, tris, a + up, c + up, b + up, Vector3.up);
-		AddFace(verts, norms, tris, a - up, b - up, c - up, Vector3.down);
+		AddFace(verts, norms, tris, ai + top, ci + top, bi + top, Vector3.up);
+		AddFace(verts, norms, tris, ai + bot, bi + bot, ci + bot, Vector3.down);
 
 		Vector3[] loop = { a, b, c };
+		Vector3[] inner = { ai, bi, ci };
 		for (int i = 0; i < 3; i++)
 		{
+			int j = (i + 1) % 3;
 			Vector3 p = loop[i];
-			Vector3 q = loop[(i + 1) % 3];
+			Vector3 q = loop[j];
+			Vector3 pi = inner[i];
+			Vector3 qi = inner[j];
 			Vector3 nrm = Vector3.Cross(Vector3.up, q - p).normalized;
-			AddFace(verts, norms, tris, p - up, q + up, q - up, nrm);
-			AddFace(verts, norms, tris, p - up, p + up, q + up, nrm);
+
+			// Yan yuz, pahlarin arasinda kalan bant.
+			AddFace(verts, norms, tris, p + botIn, q + topIn, q + botIn, nrm);
+			AddFace(verts, norms, tris, p + botIn, p + topIn, q + topIn, nrm);
+
+			if (bv <= 0f)
+				continue;
+
+			// Pah yuzu kendi duz normalini aliyor: yumusatilsaydi kenar yine
+			// kaybolurdu, oysa istenen tam olarak o ince parlak serit.
+			Vector3 nt = (nrm + Vector3.up).normalized;
+			AddFace(verts, norms, tris, p + topIn, pi + top, qi + top, nt);
+			AddFace(verts, norms, tris, p + topIn, qi + top, q + topIn, nt);
+
+			Vector3 nb = (nrm + Vector3.down).normalized;
+			AddFace(verts, norms, tris, p + botIn, qi + bot, pi + bot, nb);
+			AddFace(verts, norms, tris, p + botIn, q + botIn, qi + bot, nb);
 		}
 
 		var msh = new Mesh();
@@ -529,13 +600,13 @@ public class StackPrototype : MonoBehaviour
 		// Zemin karosu ince bir levha degil, asagi uzanan bir GOVDE. Mahjong
 		// yigininin derinligi tam olarak taslarin yan yuzunden okunuyor; yan yuz
 		// yoksa katlar ust uste degil, ic ice halkalar gibi goruluyor.
-		triMesh = BuildTriMesh(Inset, TriThick);
+		triMesh = BuildTriMesh(Inset, TriThick, Bevel);
 		FloorThick = LayerGap * SlabRatio;
-		floorMesh = BuildTriMesh(FloorInset, FloorThick);
+		floorMesh = BuildTriMesh(FloorInset, FloorThick, Bevel);
 		// Yonerge zemine CIZILMIS bir isaret, ortada duran bir cisim degil: ince ve
 		// iceri cekik. Karo meshini paylassalardi kat govdesi kadar kalinlasir ve
 		// oyuncunun ucgeninden ayirt edilemezlerdi.
-		hintMesh = BuildTriMesh(1f - HintSize, 0.02f);
+		hintMesh = BuildTriMesh(1f - HintSize, 0.02f, Bevel);
 
 		matMe = MakeMat(new Color(0.97f, 0.97f, 0.99f));
 		matHint = MakeMat(new Color(0.86f, 0.86f, 0.86f));
@@ -1786,6 +1857,8 @@ public class StackPrototype : MonoBehaviour
 			FogAmount = 0.8f;
 			HintSize = 0.42f;
 			PieceRatio = 0.26f;
+			Bevel = 0.013f;
+			Shiny = true;
 			Build();
 		}
 		y += 44f * s;
@@ -1796,6 +1869,15 @@ public class StackPrototype : MonoBehaviour
 			Hints = nh;
 			SavePrefs();
 			UpdateHints();
+		}
+		y += 34f * s;
+
+		bool ns = GUI.Toggle(new Rect(x, y, w, 26f * s), Shiny, " Parlak yuzey");
+		if (ns != Shiny)
+		{
+			Shiny = ns;
+			SavePrefs();
+			Build();
 		}
 		y += 40f * s;
 
@@ -1811,6 +1893,7 @@ public class StackPrototype : MonoBehaviour
 		Slider(ref DropTime, 0.15f, 1.2f, "Inis suresi", x, ref y, w, s, false);
 		Slider(ref HopHeight, 0f, 0.3f, "Takla yayi", x, ref y, w, s, false);
 		Slider(ref TriThick, 0.04f, 0.3f, "Ucgen kalinlik", x, ref y, w, s, true);
+		Slider(ref Bevel, 0f, 0.05f, "Pah genisligi", x, ref y, w, s, true);
 		Slider(ref Inset, 0f, 0.25f, "Ucgen bosluk", x, ref y, w, s, true);
 		Slider(ref FloorInset, 0f, 0.25f, "Zemin bosluk", x, ref y, w, s, true);
 		Slider(ref CamPitch, 20f, 85f, "Kamera egimi", x, ref y, w, s, false);
@@ -1881,6 +1964,8 @@ public class StackPrototype : MonoBehaviour
 		DropTime = PlayerPrefs.GetFloat("stk_dt", DropTime);
 		HopHeight = PlayerPrefs.GetFloat("stk_hop", HopHeight);
 		TriThick = PlayerPrefs.GetFloat("stk_th", TriThick);
+		Bevel = PlayerPrefs.GetFloat("stk_bev", Bevel);
+		Shiny = PlayerPrefs.GetInt("stk_shiny", Shiny ? 1 : 0) == 1;
 		Inset = PlayerPrefs.GetFloat("stk_in", Inset);
 		FloorInset = PlayerPrefs.GetFloat("stk_fin", FloorInset);
 		CamPitch = PlayerPrefs.GetFloat("stk_cp", CamPitch);
@@ -1904,6 +1989,8 @@ public class StackPrototype : MonoBehaviour
 		PlayerPrefs.SetFloat("stk_dt", DropTime);
 		PlayerPrefs.SetFloat("stk_hop", HopHeight);
 		PlayerPrefs.SetFloat("stk_th", TriThick);
+		PlayerPrefs.SetFloat("stk_bev", Bevel);
+		PlayerPrefs.SetInt("stk_shiny", Shiny ? 1 : 0);
 		PlayerPrefs.SetFloat("stk_in", Inset);
 		PlayerPrefs.SetFloat("stk_fin", FloorInset);
 		PlayerPrefs.SetFloat("stk_cp", CamPitch);

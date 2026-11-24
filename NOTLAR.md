@@ -175,3 +175,25 @@ Tek sey: nisana dokun. `TapRadius` yaricapi icindeki en yakin nisan secilir,
 disina dokunmak hicbir sey yapmaz. Klavye kisayollari kaldirildi (harfler
 gorunmeyince hangi tusun nereye goturdugu bilinemiyordu). Duran tuslar:
 R yeniden kur, N yeni board, Z geri al, Tab ayar paneli.
+
+## Gorsel (2026-11-24)
+
+Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
+
+1. **Pahli prizma** (`BuildTriMesh(inset, thick, bevel)`). Keskin kenar isik yakalamiyor,
+   kenar bir cizgi olarak degil iki yuzun ani renk degisimi olarak okunuyordu. Ince bir
+   pah o kenari isiga donduruyor. Ic kenar ICTEGET uzerinden kaydiriliyor - agirlik
+   merkezine lerp etmek dar acida daha cok kaydirir ve pah genisligi kenardan kenara
+   degisirdi. Pah yuzu kendi duz normalini aliyor; yumusatilsaydi kenar yine kaybolurdu,
+   oysa istenen tam olarak o ince parlak serit. `Bevel` ayardan degisiyor, 0 = eski hal.
+2. **`Assets/Resources/TriLit.shader`** - spekular + ince kenar isigi. Resources altinda
+   olmasi sart: sahne calisma aninda kuruldugu icin hicbir materyal shaderi referans
+   etmiyor ve derlemede silinirdi. `Shiny` ayari kapatilinca Legacy Diffuse'e doner,
+   yani A/B karsilastirmasi telefonda yapilabiliyor.
+3. **Iki isik + degrade ortam isigi.** Tek isikta golgede kalan yuzler duzlesiyor ve yan
+   yuz govdeden ayirt edilemiyordu; karsi yondan soguk bir dolgu kondu. Ortam isigi tek
+   renk yerine Trilight: ustten acik, altta koyu.
+
+Blender hala masada ama parca KAYNAGI olarak degil: ucgen `Inset` / `TriThick` / `Bevel`
+ayarlarina bagli uretildigi icin FBX getirmek o bagi koparir (pivot dik aci yerelde (0,0),
+bacaklar +X ve +Z). Blender'i hedef belirlemek icin kullanmak mantikli, uretim icin degil.
