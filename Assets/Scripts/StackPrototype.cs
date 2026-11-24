@@ -41,7 +41,7 @@ using UnityEngine;
 // parcalar seninle beraber dusuyor.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 10;
+	private const int DefaultsVersion = 11;
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -103,6 +103,8 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float TriThick = 0.11f;
 	[System.NonSerialized] public float Bevel = 0.013f;
 	[System.NonSerialized] public bool Shiny = true;
+	[System.NonSerialized] public float Spec = 0.14f;
+	[System.NonSerialized] public float Rim = 0f;
 	private float FloorThick;
 	[System.NonSerialized] public float Inset = 0.07f;
 	[System.NonSerialized] public float FloorInset = 0.11f;
@@ -305,15 +307,20 @@ public class StackPrototype : MonoBehaviour
 			lg.intensity = 1.05f;
 			lg.transform.rotation = Quaternion.Euler(52f, 36f, 0f);
 			// Golge olmadan ust kat alt katin uzerine oturmuyor, havada duruyor.
+			// Golge tam siddette. 0.62'ye dusurulmustu ve her sey perdeli
+			// gorunuyordu: temas golgesi yoksa parca zemine oturmuyor, yigin
+			// havada asili duruyor.
 			lg.shadows = LightShadows.Soft;
-			lg.shadowStrength = 0.62f;
 
 			// Karsi yondan soguk bir dolgu. Tek isikta golgede kalan yuzler
 			// tamamen duzlesiyor ve parcanin yan yuzu govdesinden ayirt
 			// edilemiyor; hacim esas iki isigin farkindan okunuyor.
 			var fill = new GameObject("Fill").AddComponent<Light>();
 			fill.type = LightType.Directional;
-			fill.intensity = 0.38f;
+			// Dolgu golgedeki yuzleri KALDIRIYOR, yani fazlasi dogrudan contrast
+			// kaybi. 0.38 sisli bir perde yapiyordu; yan yuzu govdeden ayirmaya
+			// yetecek kadari kaliyor.
+			fill.intensity = 0.20f;
 			fill.color = new Color(0.70f, 0.79f, 1f);
 			fill.transform.rotation = Quaternion.Euler(26f, -142f, 0f);
 			fill.shadows = LightShadows.None;
@@ -344,6 +351,11 @@ public class StackPrototype : MonoBehaviour
 
 		var m = new Material(sh);
 		m.color = c;
+		// Kenar isigi EMISSION olarak biniyor: golgeyi tanimadigi icin yuzlerce
+		// kucuk parcada ortak bir parlama yapip her seyi perdeliyordu. Bu yuzden
+		// varsayilani 0; ayardan acilabiliyor.
+		m.SetFloat("_SpecAmount", Spec);
+		m.SetFloat("_RimAmount", Rim);
 		return m;
 	}
 
@@ -1888,6 +1900,8 @@ public class StackPrototype : MonoBehaviour
 			PieceRatio = 0.26f;
 			Bevel = 0.013f;
 			Shiny = true;
+			Spec = 0.14f;
+			Rim = 0f;
 			Build();
 		}
 		y += 44f * s;
@@ -1923,6 +1937,8 @@ public class StackPrototype : MonoBehaviour
 		Slider(ref HopHeight, 0f, 0.3f, "Takla yayi", x, ref y, w, s, false);
 		Slider(ref TriThick, 0.04f, 0.3f, "Ucgen kalinlik", x, ref y, w, s, true);
 		Slider(ref Bevel, 0f, 0.05f, "Pah genisligi", x, ref y, w, s, true);
+		Slider(ref Spec, 0f, 0.6f, "Parlaklik", x, ref y, w, s, true);
+		Slider(ref Rim, 0f, 0.6f, "Kenar isigi", x, ref y, w, s, true);
 		Slider(ref Inset, 0f, 0.25f, "Ucgen bosluk", x, ref y, w, s, true);
 		Slider(ref FloorInset, 0f, 0.25f, "Zemin bosluk", x, ref y, w, s, true);
 		Slider(ref CamPitch, 20f, 85f, "Kamera egimi", x, ref y, w, s, false);
@@ -1995,6 +2011,8 @@ public class StackPrototype : MonoBehaviour
 		TriThick = PlayerPrefs.GetFloat("stk_th", TriThick);
 		Bevel = PlayerPrefs.GetFloat("stk_bev", Bevel);
 		Shiny = PlayerPrefs.GetInt("stk_shiny", Shiny ? 1 : 0) == 1;
+		Spec = PlayerPrefs.GetFloat("stk_spec", Spec);
+		Rim = PlayerPrefs.GetFloat("stk_rim", Rim);
 		Inset = PlayerPrefs.GetFloat("stk_in", Inset);
 		FloorInset = PlayerPrefs.GetFloat("stk_fin", FloorInset);
 		CamPitch = PlayerPrefs.GetFloat("stk_cp", CamPitch);
@@ -2020,6 +2038,8 @@ public class StackPrototype : MonoBehaviour
 		PlayerPrefs.SetFloat("stk_th", TriThick);
 		PlayerPrefs.SetFloat("stk_bev", Bevel);
 		PlayerPrefs.SetInt("stk_shiny", Shiny ? 1 : 0);
+		PlayerPrefs.SetFloat("stk_spec", Spec);
+		PlayerPrefs.SetFloat("stk_rim", Rim);
 		PlayerPrefs.SetFloat("stk_in", Inset);
 		PlayerPrefs.SetFloat("stk_fin", FloorInset);
 		PlayerPrefs.SetFloat("stk_cp", CamPitch);
