@@ -91,10 +91,26 @@ Ulasilamayan tas koyulmasi imkansiz (eski "maviyi alamiyorum" hatasi bu sekilde 
 dogrudan verilemez; gorunen solma `V(L)` verilip levha alfasi `a = 1 - (1-V(L))/(1-V(L-1))`
 olarak turetiliyor. 3 katta FogAmount 0.8 -> %0 / %50 / %80. Basilan kat her zaman net.
 
-**Kumanda:** nisana dokun (telefonda da ayni). En yakin nisan seciliyor, `TapRadius`
-yaricapi icinde; disina dokunmak hicbir sey yapmiyor. Harfler ve klavye kaldirildi.
-Olcu noktasi nisanin GORUNEN agirlik merkezi - `StateToPos` dik aci kosesini verdigi
-icin 0 ve 1 hamleleri orada ust uste biniyordu ve 1 hic secilemiyordu.
+**Kumanda:** gitmek istedigin yere dokun, ucgen kendi yolunu buluyor (`TapTarget` ->
+`PlanPath`). Kenar kenar yurutmek sikiciydi; rota kurmak zaten oyuncunun isi, taklalari
+tek tek tiklatmak degil. En kisa yol durumlar (kare, yarim) ve uc hamle uzerinde
+genislik aramasiyla bulunuyor; tahta en fazla `gridN * gridN * 4` durum oldugu icin her
+dokunusta bastan hesaplamak bedava.
+
+Dokunulan KARE yetiyor: karenin iki basilabilir yarisindan dokunusun dustugu taraf
+seciliyor (`Inside` + `DiagOri`), yani parmagin tam yarimin uzerine denk gelmesi
+gerekmiyor. Nisana nisan alma devri bitti, `TapRadius` kaldirildi.
+
+Dokunus takla ve inis sirasinda da yakalaniyor - birakma olayi tek kare surdugu icin
+animasyon beklenirse dokunus tamamen kayboluyor. Girdi yol adimindan ONCE okunuyor,
+boylece yururken yon degistirilebiliyor. Inis sirasindaki dokunus atiliyor: ekran
+koordinati yeni katin duzlemine goturulurse bakilmayan bir kareye donusuyor.
+
+Gidilen yer koyu bir nisanla isaretli kaliyor (`goalMark`). Gorev tamamlaninca,
+inince ve geri alinca yol temizleniyor (`ClearPath`).
+
+Masaustunde kaydirma (swipe) hala tek hamle surmek icin duruyor. Harfler ve klavye
+daha once kaldirildi.
 
 **Ayarlar:** oyun icinde IMGUI slider paneli. PlayerPrefs'e yaziyor, `DefaultsVersion`
 sabiti degisince kayitli degerler gecersiz oluyor.

@@ -15,6 +15,10 @@ using UnityEngine;
 //
 // Parcanin ustune devrilince onu yok etmiyorsun, RENGINI aliyorsun.
 //
+// HEDEFE DOKUN, GERISINI UCGEN HALLETSIN. Tahtada basilabilir herhangi bir
+// yarima dokununca en kisa yol bulunup takla takla oynatiliyor. Kenar kenar
+// yurutmek bulmacanin kendisi degil, sadece zahmetiydi.
+//
 // GEREKMEYEN PARCANIN USTUNDEN GECERSIN. Yok olmaz, yolunu da kesmez: ucgen
 // onun ustune binip devam eder (bir TriThick yukarida durur). Boylece ayni
 // yariya iki ucgen girmiyor, biri digerinin ustunde duruyor.
@@ -37,7 +41,7 @@ using UnityEngine;
 // parcalar seninle beraber dusuyor.
 public class StackPrototype : MonoBehaviour
 {
-	private const int DefaultsVersion = 8;
+	private const int DefaultsVersion = 9;
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -92,7 +96,6 @@ public class StackPrototype : MonoBehaviour
 	[System.NonSerialized] public float CamZoom = 1f;
 	[System.NonSerialized] public bool Hints = true;
 	[System.NonSerialized] public float SwipeMin = 90f;
-	[System.NonSerialized] public float TapRadius = 0.09f;
 
 	private struct Piece
 	{
@@ -119,6 +122,7 @@ public class StackPrototype : MonoBehaviour
 	private Material matHole;
 	private Material matHint;
 	private Material matHintTake;
+	private Material matGoal;
 	private Material[] matFloor;
 	private Material[] matFloorAlt;
 	private Material[] matPiece;
@@ -159,6 +163,14 @@ public class StackPrototype : MonoBehaviour
 	private readonly List<Vector3> dropTo = new List<Vector3>();
 
 	private Transform[] hints;
+	private Transform goalMark;
+	private readonly List<int> pathMoves = new List<int>();
+	private int pathAt;
+	private int pathGoal = -1;
+	private bool[] pathSeen;
+	private int[] pathFrom;
+	private int[] pathVia;
+	private int[] pathQueue;
 	private readonly List<int> popping = new List<int>();
 	private readonly List<float> popT = new List<float>();
 	private readonly List<Move> history = new List<Move>();
@@ -201,6 +213,8 @@ public class StackPrototype : MonoBehaviour
 	private Vector2Int camScreen;
 	private Vector2 pressPos;
 	private bool pressed;
+	private Vector2 tapPos;
+	private bool tapped;
 	private bool showPanel;
 	private Vector2 panelScroll;
 	private float panelLeft;
@@ -525,6 +539,7 @@ public class StackPrototype : MonoBehaviour
 		matMe = MakeMat(new Color(0.97f, 0.97f, 0.99f));
 		matHint = MakeMat(new Color(0.86f, 0.86f, 0.86f));
 		matHintTake = MakeMat(new Color(0.98f, 0.86f, 0.36f));
+		matGoal = MakeMat(new Color(0.22f, 0.24f, 0.29f));
 
 		matHole = MakeMat(new Color(0.12f, 0.12f, 0.15f));
 		matFloor = new Material[Layers];
@@ -543,6 +558,10 @@ public class StackPrototype : MonoBehaviour
 		onShape = new bool[Layers, gridN, gridN];
 		reach = new bool[Layers, gridN, gridN, 4];
 		occ = new int[Layers, gridN, gridN, 4];
+		pathSeen = new bool[gridN * gridN * 4];
+		pathFrom = new int[gridN * gridN * 4];
+		pathVia = new int[gridN * gridN * 4];
+		pathQueue = new int[gridN * gridN * 4];
 		layerRoot = new Transform[Layers];
 		fogSheet = new Transform[Layers];
 		holeCx = new int[Layers];
@@ -603,6 +622,9 @@ public class StackPrototype : MonoBehaviour
 			hints[i].gameObject.SetActive(false);
 		}
 
+		goalMark = MakeTri("Goal", hintMesh, matGoal, board);
+		goalMark.gameObject.SetActive(false);
+
 		var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
 		var cubeMesh = cube.GetComponent<MeshFilter>().sharedMesh;
 		Destroy(cube);
@@ -617,6 +639,7 @@ public class StackPrototype : MonoBehaviour
 
 		steps = 0;
 		tasks = 0;
+		ClearPath();
 		carry = -1;
 		objKind = -1;
 		objTone = -1;
@@ -821,8 +844,29 @@ public class StackPrototype : MonoBehaviour
 		if (Input.GetKeyDown(KeyCode.Tab))
 			showPanel = !showPanel;
 
+		// Dokunus takla ve inis sirasinda da yakalaniyor. Birakma olayi tek kare
+		// surdugu icin animasyonun bitmesi beklenirse dokunus tamamen kayboluyor;
+		// yururken yon degistirmek de boylece mumkun oluyor.
+		if (!showPanel || Input.mousePosition.x < panelLeft)
+		{
+			if (Input.GetMouseButtonDown(0))
+			{
+				pressPos = Input.mousePosition;
+				pressed = true;
+			}
+			else if (pressed && Input.GetMouseButtonUp(0))
+			{
+				pressed = false;
+				tapped = true;
+				tapPos = Input.mousePosition;
+			}
+		}
+
 		if (dropping)
 		{
+			// Inis sirasindaki dokunus atiliyor: ekran koordinati yeni katin
+			// duzlemine goturulurse oyuncunun bakmadigi bir kareye donusuyor.
+			tapped = false;
 			StepDrop();
 			return;
 		}
@@ -852,36 +896,40 @@ public class StackPrototype : MonoBehaviour
 		}
 
 		if (solved || lost)
+		{
+			tapped = false;
 			return;
+		}
 
-		int m = ReadMove();
-		if (m >= 0)
-			TryMove(m);
+		// Girdi once okunuyor: yurume sirasinda gelen dokunus yolu bastan kurar.
+		ReadInput();
+
+		// Planlanmis yol kendiliginden oynuyor.
+		if (!tumbling && pathAt < pathMoves.Count)
+			TryMove(pathMoves[pathAt++]);
 
 		UpdateHints();
 	}
 
-	private int ReadMove()
+	private void ReadInput()
 	{
-		if (showPanel && Input.mousePosition.x > panelLeft)
-			return -1;
+		if (!tapped)
+			return;
 
-		if (Input.GetMouseButtonDown(0))
-		{
-			pressPos = Input.mousePosition;
-			pressed = true;
-			return -1;
-		}
-		if (!pressed || !Input.GetMouseButtonUp(0))
-			return -1;
-
-		pressed = false;
-		Vector2 delta = (Vector2)Input.mousePosition - pressPos;
+		tapped = false;
+		Vector2 delta = tapPos - pressPos;
 		float scale = Mathf.Max(Screen.width, Screen.height) / 900f;
 		if (delta.magnitude > SwipeMin * scale)
-			return Steer(Mathf.Abs(delta.x) > Mathf.Abs(delta.y) ? (delta.x > 0f ? 0 : 1) : (delta.y > 0f ? 2 : 3));
+		{
+			int m = Steer(Mathf.Abs(delta.x) > Mathf.Abs(delta.y) ? (delta.x > 0f ? 0 : 1) : (delta.y > 0f ? 2 : 3));
+			if (m >= 0)
+				TryMove(m);
+			return;
+		}
 
-		return TapMove(Input.mousePosition);
+		int goal = TapTarget(tapPos);
+		if (goal >= 0)
+			PlanPath(goal);
 	}
 
 
@@ -901,44 +949,89 @@ public class StackPrototype : MonoBehaviour
 		return -1;
 	}
 
-	// Telefonda parmak nisanin tam ustune denk gelmez, ustelik dokundugu yeri
-	// kendisi kapatir. Bu yuzden karenin icinde mi diye bakmiyoruz: bol bir
-	// yaricap icindeki EN YAKIN nisan seciliyor. Yaricapin disina dokunmak
-	// hicbir sey yapmaz; uzaga basinca ucgenin kendiliginden yurumesi daha
-	// once en cok sikayet edilen seydi.
-	//
-	// Olcu noktasi StateToPos OLAMAZ: o bir durumun dik aci kosesini verir,
-	// iki komsu takla da ayni kose etrafinda dondugu icin 0 ve 1 hamlelerinin
-	// StateToPos degeri birebir ayni noktadir. Nisanlar ekranda ayri yerlerde
-	// gorunur (mesh o koseye tutturulup farkli aciyla dondurulur) ama olcum
-	// onlari ust uste sanirdi; esitlikte ilki kazandigi icin 1 numarali hamle
-	// dokunusla hic secilemiyordu. Olcu noktasi artik nisanin GORUNEN agirlik
-	// merkezi: dik aci kosesinden iki bacak yonunde birer bolu uc.
-	private int TapMove(Vector3 screen)
+	// Dokunulan yarim. Parmak dogrudan o yarimin uzerine denk gelmese bile
+	// dokundugun KARE yetiyor: karenin iki basilabilir yarisindan dokunusun
+	// dustugu taraf seciliyor, yani kosegenin hangi yaninda oldugun. Nisana
+	// nisan alma devri bitti, artik tahtanin herhangi bir yerine dokunuluyor.
+	private int TapTarget(Vector3 screen)
 	{
-		float r = Mathf.Max(Screen.width, Screen.height) * TapRadius;
-		float best = r * r;
-		int pick = -1;
-		var tap = new Vector2(screen.x, screen.y);
+		if (!PickFine(screen, out int cx, out int cy, out float fx, out float fy))
+			return -1;
+		if (cx < 0 || cy < 0 || cx >= gridN || cy >= gridN)
+			return -1;
+		if (!Shape(myLay, cx, cy))
+			return -1;
 
-		for (int m = 0; m < MoveCount; m++)
+		int o0 = DiagOri(cx, cy, 0);
+		int ori = Inside(o0, fx, fy) ? o0 : DiagOri(cx, cy, 1);
+		if (!reach[myLay, cx, cy, ori])
+			return -1;
+
+		return (cx * gridN + cy) * 4 + ori;
+	}
+
+	private void ClearPath()
+	{
+		pathMoves.Clear();
+		pathAt = 0;
+		pathGoal = -1;
+	}
+
+	// Hedefe en kisa yol: durumlar (kare, yarim) ve uc hamle uzerinde genislik
+	// aramasi. Tahta kucuk (en fazla gridN * gridN * 4 durum), her dokunusta
+	// bastan calistirmak bedava sayilir.
+	//
+	// Yol uzerinde gorevin istedigi bir parcaya basilirsa o da aliniyor; bu
+	// kayip degil, cunku kare gorevinde yalniz TASINAN renk kalkiyor ve zaten
+	// elinde o renk var, tek renk gorevinde ise her dogru renk sayiya yaziyor.
+	private void PlanPath(int goal)
+	{
+		ClearPath();
+
+		int start = (myCx * gridN + myCy) * 4 + myOri;
+		if (goal == start)
+			return;
+
+		int n = gridN * gridN * 4;
+		for (int i = 0; i < n; i++)
+			pathSeen[i] = false;
+
+		int head = 0;
+		int tail = 0;
+		pathSeen[start] = true;
+		pathQueue[tail++] = start;
+
+		while (head < tail)
 		{
-			if (!Landing(myLay, myCx, myCy, myOri, m, out int nx, out int ny, out int no))
-				continue;
+			int v = pathQueue[head++];
+			int o = v & 3;
+			int y = (v >> 2) % gridN;
+			int x = (v >> 2) / gridN;
 
-			float rx = nx + (no & 1);
-			float ry = ny + ((no >> 1) & 1);
-			float lx = (no & 1) == 0 ? 1f : -1f;
-			float ly = ((no >> 1) & 1) == 0 ? 1f : -1f;
+			for (int m = 0; m < MoveCount; m++)
+			{
+				if (!Landing(myLay, x, y, o, m, out int nx, out int ny, out int no))
+					continue;
 
-			Vector3 sp = cam.WorldToScreenPoint(CornerToWorld(myLay, rx + lx / 3f, ry + ly / 3f));
-			float d = (new Vector2(sp.x, sp.y) - tap).sqrMagnitude;
-			if (d >= best)
-				continue;
-			best = d;
-			pick = m;
+				int w = (nx * gridN + ny) * 4 + no;
+				if (pathSeen[w])
+					continue;
+
+				pathSeen[w] = true;
+				pathFrom[w] = v;
+				pathVia[w] = m;
+				pathQueue[tail++] = w;
+
+				if (w != goal)
+					continue;
+
+				for (int c = goal; c != start; c = pathFrom[c])
+					pathMoves.Add(pathVia[c]);
+				pathMoves.Reverse();
+				pathGoal = goal;
+				return;
+			}
 		}
-		return pick;
 	}
 
 	private static bool Inside(int ori, float fx, float fy)
@@ -1098,6 +1191,8 @@ public class StackPrototype : MonoBehaviour
 	private void CompleteTask()
 	{
 		tasks++;
+		// Gorev degisti, eski hedef artik baska bir seyin pesindeydi.
+		ClearPath();
 		NextTask();
 	}
 
@@ -1293,6 +1388,8 @@ public class StackPrototype : MonoBehaviour
 
 		for (int i = 0; i < MoveCount; i++)
 			hints[i].gameObject.SetActive(false);
+		goalMark.gameObject.SetActive(false);
+		ClearPath();
 
 		// Yeni katta hangi renkler var belli degil; gorev bastan seciliyor.
 		NextTask();
@@ -1380,6 +1477,7 @@ public class StackPrototype : MonoBehaviour
 		if (mv.Lay != myLay || mv.Dove)
 			return;
 
+		ClearPath();
 		history.RemoveAt(history.Count - 1);
 		Revive(mv.A);
 		Revive(mv.B);
@@ -1430,6 +1528,19 @@ public class StackPrototype : MonoBehaviour
 	{
 		if (hints == null)
 			return;
+
+		// Gidilen yer isaretli kaliyor: dokundugun seye gercekten yoneldigini
+		// yol bitmeden gormek gerekiyor.
+		bool walking = pathAt < pathMoves.Count && pathGoal >= 0;
+		goalMark.gameObject.SetActive(walking);
+		if (walking)
+		{
+			int go = pathGoal & 3;
+			int gy = (pathGoal >> 2) % gridN;
+			int gx = (pathGoal >> 2) / gridN;
+			goalMark.position = MePos(myLay, gx, gy, go) + Vector3.down * (TriThick * 0.5f - 0.004f);
+			goalMark.rotation = StateToRot(go);
+		}
 
 		bool live = Hints && !tumbling && !dropping && !solved && !lost;
 		for (int m = 0; m < MoveCount; m++)
@@ -1643,7 +1754,6 @@ public class StackPrototype : MonoBehaviour
 		Slider(ref SlabRatio, 0.1f, 1.6f, "Kat govde yuksekligi", x, ref y, w, s, true);
 		Slider(ref FogAmount, 0f, 0.93f, "En alt kat sisi", x, ref y, w, s, true);
 		Slider(ref HintSize, 0.12f, 0.9f, "Yonerge boyutu", x, ref y, w, s, true);
-		Slider(ref TapRadius, 0.03f, 0.2f, "Dokunus yaricapi", x, ref y, w, s, false);
 		Slider(ref TumbleTime, 0.05f, 0.4f, "Takla suresi", x, ref y, w, s, false);
 		Slider(ref DropTime, 0.15f, 1.2f, "Inis suresi", x, ref y, w, s, false);
 		Slider(ref HopHeight, 0f, 0.3f, "Takla yayi", x, ref y, w, s, false);
@@ -1690,7 +1800,7 @@ public class StackPrototype : MonoBehaviour
 		}
 		y += 42f * s;
 
-		GUI.Label(new Rect(x, y, w, 24f * s), "Nisana dokun (telefonda da ayni)");
+		GUI.Label(new Rect(x, y, w, 24f * s), "Gitmek istedigin yere dokun");
 		y += 24f * s;
 		GUI.Label(new Rect(x, y, w, 24f * s), "Parcaya basinca rengini alirsin");
 		y += 24f * s;
@@ -1746,7 +1856,6 @@ public class StackPrototype : MonoBehaviour
 		SlabRatio = PlayerPrefs.GetFloat("stk_slab", SlabRatio);
 		FogAmount = PlayerPrefs.GetFloat("stk_fog", FogAmount);
 		HintSize = PlayerPrefs.GetFloat("stk_hsz", HintSize);
-		TapRadius = PlayerPrefs.GetFloat("stk_tap", TapRadius);
 		TumbleTime = PlayerPrefs.GetFloat("stk_tt", TumbleTime);
 		DropTime = PlayerPrefs.GetFloat("stk_dt", DropTime);
 		HopHeight = PlayerPrefs.GetFloat("stk_hop", HopHeight);
@@ -1770,7 +1879,6 @@ public class StackPrototype : MonoBehaviour
 		PlayerPrefs.SetFloat("stk_slab", SlabRatio);
 		PlayerPrefs.SetFloat("stk_fog", FogAmount);
 		PlayerPrefs.SetFloat("stk_hsz", HintSize);
-		PlayerPrefs.SetFloat("stk_tap", TapRadius);
 		PlayerPrefs.SetFloat("stk_tt", TumbleTime);
 		PlayerPrefs.SetFloat("stk_dt", DropTime);
 		PlayerPrefs.SetFloat("stk_hop", HopHeight);
