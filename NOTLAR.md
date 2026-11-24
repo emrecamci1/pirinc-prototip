@@ -211,10 +211,11 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
    Yeniden bir netlik sikayeti gelirse once NEYIN okunmadigini sor (rozet mi, parca
    kenari mi, hangi kat) ve o tek seyi duzelt; sahne isigini topluca degistirme.
 
-   Rozet rengine isik carpanini uygulayan `Swatch()` de GERI ALINDI: carpan kanallari
-   1'de kirptigi icin rozetler solgunlasiyordu (sari neredeyse beyaz). Rozet ham
-   `PieceTone` ile ciziliyor - yani tahtadan daha doygun, kasitli. Gorsel olarak
-   onaylanan hal e5757d1 commit'idir; bir sey bozuldu sanirsan once ona bak.
+   Rozet rengi: `Swatch()` isik carpanini rozete de uyguluyor (v4). Bir kez geri
+   alinmisti, sonra tekrar istendi - "rozetin rengi board ustundeki ucgen renkleri
+   gibi olsun ama isik koymadan, sadece renklerle". Yani yeni bir isik yok, sadece
+   renk hesabi. Kanallarin 1'de kirpilmasi KASITLI: tahtada da ayni sekilde
+   kirpiliyor, rozetin solgun gorunmesi parcanin solgun gorunmesinden.
 
 
 Referans modeli: `Documents/Blender/Eskiz/blender_ucgen_oyun.py` tek ucgeni oyunun

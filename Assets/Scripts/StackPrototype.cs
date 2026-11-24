@@ -47,7 +47,7 @@ public class StackPrototype : MonoBehaviour
 	// Her itilen degisiklikte bir artar ve ayni numara git etiketi olarak atilir,
 	// yani "v6 daha iyiydi" demek o surume birebir donmeye yetiyor. SURUMLER.md
 	// hangi numarada ne degistigini tutuyor.
-	private const string Version = "v3";
+	private const string Version = "v4";
 
 	// Yonelim = dik acinin hucre icinde hangi kosede oldugu.
 	// bit0: 0 = sol, 1 = sag     bit1: 0 = alt, 1 = ust
@@ -74,6 +74,18 @@ public class StackPrototype : MonoBehaviour
 	};
 
 	private static readonly Color BackColor = new Color(0.80f, 0.79f, 0.75f);
+
+	// Parca tahtada isik altinda duruyor, rozet ise duz bir damga. Ham albedo
+	// cizmek rozeti tahtadakinden farkli gosteriyordu ve hangi rozetin hangi
+	// parca oldugu anlasilmiyordu.
+	//
+	// Ust yuze dusen toplam carpan, kanal basina:
+	//   gunes   1.05 * sin(52) = 0.827          (beyaz)
+	//   dolgu   0.38 * sin(26) = 0.167          x (0.70, 0.79, 1.00)
+	//   gok ortami                              = (0.64, 0.68, 0.76)
+	// Renk uzayi Gamma oldugu icin carpan dogrudan sRGB degeri uzerinde isliyor.
+	// ISIK DEGERLERI DEGISIRSE BURASI DA DEGISMELI.
+	private static readonly Color LitMul = new Color(1.584f, 1.639f, 1.754f);
 
 	private static readonly Color[] PieceTone =
 	{
@@ -339,6 +351,17 @@ public class StackPrototype : MonoBehaviour
 		var m = new Material(sh);
 		m.color = c;
 		return m;
+	}
+
+	// Rozet rengi: parcanin isik altindaki hali. Kirpilma da bilerek aynen
+	// birakiliyor, tahtada da ayni sekilde kirpiliyor.
+	private static Color Swatch(int tone)
+	{
+		Color c = PieceTone[tone];
+		return new Color(
+			Mathf.Min(1f, c.r * LitMul.r),
+			Mathf.Min(1f, c.g * LitMul.g),
+			Mathf.Min(1f, c.b * LitMul.b));
 	}
 
 	private static bool InHalf(int k, int tx, int ty)
@@ -1796,22 +1819,22 @@ public class StackPrototype : MonoBehaviour
 				// Dolu yarim tahtada DURAN parca, ici bos olan SENIN getirecegin
 				// renk. Iki renkli duz bir kare hangisini hangisine goturecegini
 				// soylemiyordu; en cok takilan yer burasiydi.
-				GUI.color = PieceTone[wantB];
+				GUI.color = Swatch(wantB);
 				GUI.DrawTexture(r, halfTex[wantOri ^ 3]);
 
 				// Renk zaten elindeyse bos yarim doluyor: soru artik hangisini
 				// getirecegin degil, nereye basacagin.
-				var ghost = PieceTone[wantA];
+				var ghost = Swatch(wantA);
 				if (carry != wantA)
 					ghost.a = 0.28f;
 				GUI.color = ghost;
 				GUI.DrawTexture(r, halfTex[wantOri]);
-				GUI.color = PieceTone[wantA];
+				GUI.color = Swatch(wantA);
 				GUI.DrawTexture(r, edgeTex[wantOri]);
 			}
 			else
 			{
-				GUI.color = PieceTone[objTone];
+				GUI.color = Swatch(objTone);
 				GUI.DrawTexture(r, upTex);
 			}
 			GUI.color = oc;
