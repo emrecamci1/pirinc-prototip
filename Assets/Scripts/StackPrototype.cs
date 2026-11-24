@@ -284,18 +284,23 @@ public class StackPrototype : MonoBehaviour
 		{
 			var lg = new GameObject("Sun").AddComponent<Light>();
 			lg.type = LightType.Directional;
-			lg.intensity = 1.05f;
+			// Siddetler keyfi degil, KALIBRE: ust yuze dusen toplam carpan
+			// (gunes * sin52 + dolgu * sin26 + gok ortami) 1.0 civarinda tutuluyor.
+			// Boylece parca tahtada kendi rengiyle goruluyor ve ustteki gorev
+			// rozetiyle ayni okunuyor. Onceki degerlerde carpan 1.6 idi: doygun
+			// kirmizi beyaza kirpiliyor, rozetle tahta birbirini tutmuyordu.
+			lg.intensity = 0.62f;
 			lg.transform.rotation = Quaternion.Euler(52f, 36f, 0f);
 			// Golge olmadan ust kat alt katin uzerine oturmuyor, havada duruyor.
 			lg.shadows = LightShadows.Soft;
-			lg.shadowStrength = 0.62f;
+			lg.shadowStrength = 0.55f;
 
 			// Karsi yondan soguk bir dolgu. Tek isikta golgede kalan yuzler
 			// tamamen duzlesiyor ve parcanin yan yuzu govdesinden ayirt
 			// edilemiyor; hacim esas iki isigin farkindan okunuyor.
 			var fill = new GameObject("Fill").AddComponent<Light>();
 			fill.type = LightType.Directional;
-			fill.intensity = 0.38f;
+			fill.intensity = 0.24f;
 			fill.color = new Color(0.70f, 0.79f, 1f);
 			fill.transform.rotation = Quaternion.Euler(26f, -142f, 0f);
 			fill.shadows = LightShadows.None;
@@ -304,9 +309,9 @@ public class StackPrototype : MonoBehaviour
 		// Tek renk ortam isigi her yuzu esit aydinlatip hacmi siliyordu. Ustten
 		// acik, altta koyu bir degrade pahlari kendiliginden ayiriyor.
 		RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-		RenderSettings.ambientSkyColor = new Color(0.64f, 0.68f, 0.76f);
-		RenderSettings.ambientEquatorColor = new Color(0.50f, 0.51f, 0.55f);
-		RenderSettings.ambientGroundColor = new Color(0.32f, 0.31f, 0.34f);
+		RenderSettings.ambientSkyColor = new Color(0.42f, 0.44f, 0.49f);
+		RenderSettings.ambientEquatorColor = new Color(0.33f, 0.34f, 0.37f);
+		RenderSettings.ambientGroundColor = new Color(0.22f, 0.21f, 0.23f);
 
 		Build();
 		SetupCamera();

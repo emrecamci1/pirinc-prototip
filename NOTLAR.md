@@ -190,7 +190,14 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
    olmasi sart: sahne calisma aninda kuruldugu icin hicbir materyal shaderi referans
    etmiyor ve derlemede silinirdi. `Shiny` ayari kapatilinca Legacy Diffuse'e doner,
    yani A/B karsilastirmasi telefonda yapilabiliyor.
-3. **Iki isik + degrade ortam isigi.** Tek isikta golgede kalan yuzler duzlesiyor ve yan
+3. **Iki isik + degrade ortam isigi.** Siddetler keyfi degil, KALIBRE: ust yuze dusen
+   toplam carpan (gunes * sin52 + dolgu * sin26 + gok ortami) 1.0 civarinda tutuluyor,
+   boylece parca tahtada kendi rengiyle goruluyor ve ustteki gorev rozetiyle ayni okunuyor.
+   Renk uzayi Gamma (`m_ActiveColorSpace: 0`) oldugu icin carpan dogrudan sRGB degeri
+   uzerinde isliyor, yani 1.0 birebir esitlik demek. Onceki degerlerde carpan 1.6 idi:
+   doygun kirmizi beyaza kirpiliyor, rozetle tahta birbirini tutmuyordu. Isik degerlerini
+   degistirirken bu carpani korumak gerekiyor.
+   Tek isikta golgede kalan yuzler duzlesiyor ve yan
    yuz govdeden ayirt edilemiyordu; karsi yondan soguk bir dolgu kondu. Ortam isigi tek
    renk yerine Trilight: ustten acik, altta koyu.
 
