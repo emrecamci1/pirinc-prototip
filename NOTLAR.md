@@ -217,6 +217,10 @@ Sorun mesh silueti degildi, golgelemeydi. Uc sey birden degisti:
    onaylanan hal e5757d1 commit'idir; bir sey bozuldu sanirsan once ona bak.
 
 
+Referans modeli: `Documents/Blender/Eskiz/blender_ucgen_oyun.py` tek ucgeni oyunun
+birebir olculerinde kuruyor (bacak 0.93, kalinlik 0.11, pah 0.013, pah sadece cevre
+kenarlarinda, dikey koseler keskin). Olcu degisirse script parametre aliyor.
+
 Blender hala masada ama parca KAYNAGI olarak degil: ucgen `Inset` / `TriThick` / `Bevel`
 ayarlarina bagli uretildigi icin FBX getirmek o bagi koparir (pivot dik aci yerelde (0,0),
 bacaklar +X ve +Z). Blender'i hedef belirlemek icin kullanmak mantikli, uretim icin degil.
